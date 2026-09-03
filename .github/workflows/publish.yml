@@ -1,10 +1,9 @@
 # 手动发布：更新版本号 + 打 tag + 构建 Docker 镜像
-# 版本号可手动指定，留空则自动 递增 patch 版本
 # 全程使用 GITHUB_TOKEN，无需额外配置 PAT
 #
 # 用法：Actions 页 → Publish → Run workflow
-#   - version 留空：读取当前 version 并自动 patch+1（如 1.0.0 → 1.0.1）
-#   - version 填 1.0.5：直接使用指定版本号
+#   - 推荐在 version 输入框手动填写本次发布版本号（版本号只在发版时更新，见 docs/VERSIONING.md）
+#   - 留空才会自动 patch+1（如 1.0.0 → 1.0.1），请仅在确认需要时使用
 
 name: Publish
 
