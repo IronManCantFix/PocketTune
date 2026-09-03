@@ -2,15 +2,11 @@
   <div class="setting-type">
     <div class="set-list">
       <n-h3 prefix="bar"> 关于软件 </n-h3>
-      <n-alert type="warning" style="margin-bottom: 12px">
-        <template #header>本项目已进入维护模式</template>
-        后续仅进行必要的维护与重大问题修复，不再主动开发新功能。新功能及后续版本请移步
-        <n-button
-          text
-          type="primary"
-          @click="openLink('https://github.com/SPlayer-Dev/SPlayer-Next')"
-        >
-          SPlayer-Next
+      <n-alert type="info" style="margin-bottom: 12px">
+        <template #header>本项目为 SPlayer 的分支二次开发</template>
+        主要适配移动端的 Web 音乐播放器，感谢原作者 imsyy。本项目开源地址：
+        <n-button text type="primary" @click="openLink(FORK_REPO_URL)">
+          {{ FORK_REPO_URL.replace("https://github.com/", "") }}
         </n-button>
       </n-alert>
       <n-card class="set-item">
@@ -22,31 +18,14 @@
             {{ packageJson.version }}
           </n-tag>
         </n-flex>
-        <n-flex>
-          <n-button type="primary" strong secondary @click="checkUpdate"> 检查更新 </n-button>
-        </n-flex>
+        <n-collapse-transition :show="hasNewVersion">
+          <n-alert type="success" style="margin-bottom: 12px">
+            <template #header>发现新版本 {{ latestVersion }}</template>
+            当前版本 {{ getFullVersion() }}，点击前往下载
+            <n-button text type="primary" @click="openLink(FORK_TAGS_URL)"> 前往查看 </n-button>
+          </n-alert>
+        </n-collapse-transition>
       </n-card>
-      <n-collapse-transition :show="!!updateData">
-        <n-card class="set-item update-data">
-          <n-collapse arrow-placement="right">
-            <n-collapse-item name="version">
-              <template #header>
-                <n-flex class="version">
-                  <n-text>最新版本</n-text>
-                  <n-tag :bordered="false" size="small" type="primary">
-                    {{ newVersion?.version || "v0.0.0" }}
-                  </n-tag>
-                  <n-tag v-if="newVersion?.prerelease" class="test" size="small" type="warning">
-                    测试版
-                  </n-tag>
-                  <n-text :depth="3" class="time">{{ newVersion?.time }}</n-text>
-                </n-flex>
-              </template>
-              <div class="markdown-body" v-html="newVersion?.changelog" @click="jumpLink" />
-            </n-collapse-item>
-          </n-collapse>
-        </n-card>
-      </n-collapse-transition>
     </div>
     <div class="set-list">
       <n-h3 prefix="bar"> 特别鸣谢 </n-h3>
@@ -172,38 +151,19 @@
         </n-card>
       </n-flex>
     </div>
-    <div class="set-list">
-      <n-h3 prefix="bar"> 历史版本 </n-h3>
-      <n-collapse-transition :show="oldVersion?.length > 0">
-        <n-collapse accordion>
-          <n-collapse-item
-            v-for="(item, index) in oldVersion"
-            :key="index"
-            :title="item.version"
-            :name="item.version"
-          >
-            <n-card class="set-item update-data">
-              <n-flex class="version" justify="space-between">
-                <n-tag :bordered="false" size="small" type="primary">
-                  {{ item?.version || "v0.0.0" }}
-                </n-tag>
-                <n-text :depth="3" class="time">{{ item?.time }}</n-text>
-              </n-flex>
-              <div class="markdown-body" v-html="item?.changelog" @click="jumpLink" />
-            </n-card>
-          </n-collapse-item>
-        </n-collapse>
-      </n-collapse-transition>
-    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import type { UpdateLogType } from "@/types/main";
-import { getUpdateLog, openLink } from "@/utils/helper";
-import { debounce } from "lodash-es";
+import { openLink } from "@/utils/helper";
+import { getFullVersion } from "@/utils/version";
 import { useStatusStore } from "@/stores";
 import packageJson from "@/../package.json";
+
+// 二开 fork 仓库相关信息
+const FORK_REPO = "IronManCantFix/PocketTune";
+const FORK_REPO_URL = `https://github.com/${FORK_REPO}`;
+const FORK_TAGS_URL = `${FORK_REPO_URL}/tags`;
 
 const statusStore = useStatusStore();
 
@@ -316,39 +276,45 @@ const communityData = [
   },
 ];
 
-// 更新日志数据
-const updateData = ref<UpdateLogType[] | null>(null);
+// fork 仓库最新版本
+const latestVersion = ref("");
+const hasNewVersion = computed(() => latestVersion.value !== "");
 
-// 最新版本
-const newVersion = computed<UpdateLogType | undefined>(() => updateData.value?.[0]);
-
-// 历史版本
-const oldVersion = computed<UpdateLogType[]>(() => {
-  const oldData = updateData.value?.slice(1);
-  return oldData ? oldData : [];
-});
-
-// 检查更新
-const checkUpdate = debounce(
-  () => {
-    window.open(packageJson.github + "/releases", "_blank");
-  },
-  300,
-  { leading: true, trailing: false },
-);
-
-// 链接跳转
-const jumpLink = (e: MouseEvent) => {
-  const target = e.target as HTMLElement;
-  if (target.tagName !== "A") {
-    return;
+// 版本号数值化比较（如 3.1.2 -> 3,1,2 逐段比较）
+const compareVersion = (a: string, b: string): number => {
+  const toNums = (v: string) =>
+    v
+      .replace(/^v/i, "")
+      .split(".")
+      .map((n) => parseInt(n, 10) || 0);
+  const na = toNums(a);
+  const nb = toNums(b);
+  const len = Math.max(na.length, nb.length);
+  for (let i = 0; i < len; i++) {
+    const da = na[i] || 0;
+    const db = nb[i] || 0;
+    if (da !== db) return da > db ? 1 : -1;
   }
-  e.preventDefault();
-  openLink((target as HTMLAnchorElement).href);
+  return 0;
 };
 
-// 获取更新日志
-const getUpdateData = async () => (updateData.value = await getUpdateLog());
+// 检测 fork 仓库是否有新版本
+const checkLatestVersion = async () => {
+  try {
+    const response = await fetch(`https://api.github.com/repos/${FORK_REPO}/tags?per_page=1`);
+    if (!response.ok) return;
+    const tags = await response.json();
+    const latestTag = Array.isArray(tags) && tags[0]?.name;
+    if (typeof latestTag !== "string") return;
+    const tagVersion = latestTag.replace(/^v/i, "");
+    if (compareVersion(tagVersion, getFullVersion()) > 0) {
+      latestVersion.value = latestTag;
+      window.$message.success(`发现新版本 ${latestTag}，点击前往下载`);
+    }
+  } catch (error) {
+    console.error("获取最新版本失败：", error);
+  }
+};
 
 // 打开开发者模式
 const openDeveloperMode = useThrottleFn(() => {
@@ -369,7 +335,7 @@ const openDeveloperMode = useThrottleFn(() => {
 }, 100);
 
 onMounted(() => {
-  getUpdateData();
+  checkLatestVersion();
   getContributors();
 });
 </script>
@@ -381,23 +347,6 @@ onMounted(() => {
   }
   .n-tag {
     border-radius: 6px;
-  }
-}
-.update-data {
-  :deep(.n-card__content) {
-    flex-direction: column !important;
-    align-items: normal !important;
-  }
-  .version {
-    padding-left: 4px;
-    .n-tag {
-      pointer-events: none;
-      border-radius: 6px;
-    }
-    .time {
-      margin-left: auto;
-      font-size: 13px;
-    }
   }
 }
 .link {
