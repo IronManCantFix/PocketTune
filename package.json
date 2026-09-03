@@ -13,6 +13,7 @@
     "pnpm": ">=10"
   },
   "type": "module",
+  "packageManager": "pnpm@10.34.5",
   "scripts": {
     "api": "tsx server/index.ts",
     "dev": "vite",
