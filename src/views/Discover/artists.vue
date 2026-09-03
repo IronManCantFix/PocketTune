@@ -2,7 +2,7 @@
   <div class="discover-artists">
     <div class="menu">
       <!-- 字母分类 -->
-      <n-flex class="initial">
+      <n-flex class="initial" wrap>
         <n-tag
           v-for="(item, index) in artistInitials"
           :key="index"
@@ -15,7 +15,7 @@
         </n-tag>
       </n-flex>
       <!-- 地区分类 -->
-      <n-flex class="category">
+      <n-flex class="category" wrap>
         <n-tag
           v-for="(item, index) in artistTypeNames"
           :key="item"

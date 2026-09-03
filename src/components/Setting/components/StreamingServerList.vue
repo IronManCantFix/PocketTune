@@ -169,4 +169,22 @@ const handleConnect = async (server: StreamingServerConfig) => {
     width: 200px;
   }
 }
+
+/* 移动端适配：减小按钮区域宽度 */
+@media (max-width: 768px) {
+  #server-list-choose {
+    .set {
+      width: 140px;
+    }
+  }
+}
+
+@media (max-width: 480px) {
+  #server-list-choose {
+    .set {
+      width: auto;
+      min-width: 100px;
+    }
+  }
+}
 </style>

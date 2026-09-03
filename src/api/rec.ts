@@ -49,7 +49,11 @@ export const radarPlaylist = async () => {
     });
   });
   const result = await Promise.allSettled(allRadar);
-  return result.map((res: any) => res?.value.playlist);
+  // 过滤掉 rejected 状态，避免访问 .value 时崩溃
+  return result
+    .filter((res): res is PromiseFulfilledResult<any> => res.status === "fulfilled")
+    .map((res) => res.value?.playlist)
+    .filter(Boolean);
 };
 
 /**

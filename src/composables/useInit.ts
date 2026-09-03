@@ -21,8 +21,13 @@ export const useInit = () => {
     settingStore.checkAndMigrate();
     // 打印版本信息
     printVersion();
-    // 加载数据
-    await dataStore.loadData();
+    // 加载数据（包裹 try-catch 防止初始化链断裂）
+    try {
+      await dataStore.loadData();
+    } catch (error) {
+      console.error("加载数据失败:", error);
+      window.$message?.error("数据加载失败，部分功能可能不可用");
+    }
     // 初始化 MediaSession
     mediaSessionManager.init();
     // 初始化播放器

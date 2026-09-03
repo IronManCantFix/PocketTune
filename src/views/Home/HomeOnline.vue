@@ -248,12 +248,14 @@ onMounted(() => {
   .date {
     display: flex;
     align-items: center;
+    min-width: 0;
     margin-bottom: 4px;
     .date-icon {
       position: relative;
       display: flex;
       align-items: center;
       justify-content: center;
+      flex-shrink: 0;
       margin-right: 4px;
       .n-text {
         position: absolute;
@@ -267,6 +269,11 @@ onMounted(() => {
     .name {
       font-size: 18px;
       font-weight: bold;
+      min-width: 0;
+      flex: 1 1 auto;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
   }
   @media (max-width: 768px) {
@@ -276,6 +283,17 @@ onMounted(() => {
     .rec-list {
       display: grid !important;
       grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+    }
+    .date {
+      .name {
+        font-size: 16px;
+      }
+    }
+  }
+  @media (max-width: 380px) {
+    .rec-list {
+      grid-template-columns: repeat(1, 1fr);
     }
   }
 }

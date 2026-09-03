@@ -167,6 +167,8 @@ const route = useRoute();
 const router = useRouter();
 const dataStore = useDataStore();
 const settingStore = useSettingStore();
+// 与移动端样式的 @media (max-width: 768px) 保持一致
+const isSmallScreen = useMediaQuery("(max-width: 768px)");
 
 // 路由元素
 const componentRef = ref<InstanceType<typeof ArtistSongs> | null>(null);
@@ -240,7 +242,7 @@ const getArtistDetail = async (id: number) => {
     // 附加身份
     artistDetailData.value.identify = result.data.identify?.imageDesc;
   } catch (error) {
-    console.error("Erorr getting artist detail:", error);
+    console.error("Error getting artist detail:", error);
     window.$message.error("获取歌手详情失败");
   }
 };
@@ -261,6 +263,8 @@ const playAllSongs = async () => {
 
 // 列表滚动
 const listScroll = (e: Event) => {
+  // 移动端为纵向布局，不收缩头部，避免布局跳动
+  if (isSmallScreen.value) return;
   // 滚动高度
   const scrollTop = (e.target as HTMLElement).scrollTop;
   listScrolling.value = scrollTop > 10;
@@ -287,6 +291,7 @@ watch(
 
 <style lang="scss" scoped>
 .artist {
+  position: relative;
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -440,34 +445,82 @@ watch(
         opacity 0.3s;
     }
   }
-  &.small {
-    .detail {
-      height: 120px;
-      .cover {
-        margin-right: 12px;
-        .cover-mask,
-        .play-count {
-          opacity: 0;
+  // 桌面端：滚动时收起歌手头部。移动端为纵向布局，无需收起，若应用这些规则会与移动端样式冲突导致布局错乱
+  @media (min-width: 769px) {
+    &.small {
+      .detail {
+        height: 120px;
+        .cover {
+          margin-right: 12px;
+          .cover-mask,
+          .play-count {
+            opacity: 0;
+          }
+        }
+        .data {
+          .name {
+            font-size: 22px;
+          }
+          .menu {
+            .n-button,
+            .search {
+              height: 32px;
+              --n-font-size: 13px;
+              --n-padding: 0 14px;
+              --n-icon-size: 16px;
+            }
+          }
         }
       }
+      .router-view {
+        &.artist-songs {
+          padding-top: 160px;
+        }
+      }
+    }
+  }
+}
+
+// 移动端适配：歌手页纵向布局
+@media (max-width: 768px) {
+  .artist {
+    .detail {
+      flex-direction: column;
+      height: auto;
+      padding: 12px 0 20px 0;
+      .cover {
+        width: 120px;
+        height: 120px;
+        margin: 0 auto 16px;
+      }
       .data {
+        padding-right: 0;
         .name {
           font-size: 22px;
+          height: auto;
+          text-align: center;
+        }
+        .identify {
+          text-align: center;
+        }
+        .collapse {
+          position: static;
+          margin: 8px 0;
+        }
+        .meta {
+          justify-content: center;
         }
         .menu {
-          .n-button,
-          .search {
-            height: 32px;
-            --n-font-size: 13px;
-            --n-padding: 0 14px;
-            --n-icon-size: 16px;
-          }
+          position: static;
+          justify-content: center;
+          margin-top: 12px;
         }
       }
     }
     .router-view {
       &.artist-songs {
-        padding-top: 160px;
+        position: static;
+        padding-top: 0;
       }
     }
   }

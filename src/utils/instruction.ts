@@ -74,5 +74,15 @@ export const visibleDirective = {
       });
     };
     const { stop } = useIntersectionObserver(el, handleIntersection, { threshold: 0.1 });
+
+    // 组件卸载时停止观察，防止内存泄漏
+    (el as any)._visibleStop = stop;
+  },
+  beforeUnmount(el: HTMLElement) {
+    const stop = (el as any)._visibleStop;
+    if (typeof stop === "function") {
+      stop();
+      delete (el as any)._visibleStop;
+    }
   },
 };

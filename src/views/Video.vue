@@ -339,8 +339,6 @@ onDeactivated(() => {
 });
 
 onMounted(() => {
-  console.log(11);
-
   closeMusic();
   // 初始化播放器
   initPlayer();
@@ -414,16 +412,6 @@ onUnmounted(() => {
         }
       }
     }
-    // &.hidden {
-    //   :deep(.plyr) {
-    //     position: fixed;
-    //     right: 40px;
-    //     bottom: 40px;
-    //     width: 400px;
-    //     height: auto;
-    //     z-index: 999;
-    //   }
-    // }
   }
   .menu {
     height: 40px;

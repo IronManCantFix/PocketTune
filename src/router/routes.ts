@@ -112,7 +112,7 @@ const appRoutes: Array<RouteRecordRaw> = [
       },
     ],
   },
-  // 歌单
+  // 视频
   {
     path: "/video",
     name: "video",

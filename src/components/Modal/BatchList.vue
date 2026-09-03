@@ -9,7 +9,7 @@
       virtual-scroll
       @update:checked-row-keys="tableCheck"
     />
-    <n-flex class="batch-footer" justify="space-between" align="center">
+    <n-flex class="batch-footer" justify="space-between" align="center" wrap>
       <n-flex align="center">
         <n-text :depth="3" class="count">已选择 {{ checkCount }} 首</n-text>
         <n-popover trigger="click" placement="right">

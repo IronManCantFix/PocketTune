@@ -18,6 +18,7 @@ interface DownloadStrategy {
   readonly name: string;
   readonly song: SongType;
   readonly downloadUrl: string;
+  signal?: AbortSignal;
 
   // 准备阶段：获取链接，获取歌词
   prepare(): Promise<void>;
@@ -46,6 +47,7 @@ class SongDownloadStrategy implements DownloadStrategy {
   constructor(
     public readonly song: SongType,
     private quality: SongLevelType,
+    private signal?: AbortSignal,
   ) {}
 
   get id() {
@@ -167,7 +169,11 @@ class SongDownloadStrategy implements DownloadStrategy {
     // 尝试使用播放链接
     if (usePlayback) {
       try {
-        const result = await songUrl(this.song.id, levelName as Parameters<typeof songUrl>[1]);
+        const result = await songUrl(
+          this.song.id,
+          levelName as Parameters<typeof songUrl>[1],
+          this.signal,
+        );
         if (result.code === 200 && result?.data?.[0]?.url) {
           return {
             url: result.data[0].url,
@@ -175,6 +181,7 @@ class SongDownloadStrategy implements DownloadStrategy {
           };
         }
       } catch (e) {
+        if (this.signal?.aborted) throw new Error("下载已取消");
         console.error("Error fetching playback url for download:", e);
       }
     }
@@ -198,13 +205,18 @@ class SongDownloadStrategy implements DownloadStrategy {
         if (servers.length > 0) {
           const results = await Promise.allSettled(
             servers.map((server) =>
-              unlockSongUrl(this.song.id, keyWord, server, this.song.name, String(artist)).then(
-                (result) => ({
-                  server,
-                  result,
-                  success: result.code === 200 && !!result.url,
-                }),
-              ),
+              unlockSongUrl(
+                this.song.id,
+                keyWord,
+                server,
+                this.song.name,
+                String(artist),
+                this.signal,
+              ).then((result) => ({
+                server,
+                result,
+                success: result.code === 200 && !!result.url,
+              })),
             ),
           );
 
@@ -222,12 +234,13 @@ class SongDownloadStrategy implements DownloadStrategy {
           }
         }
       } catch (e) {
+        if (this.signal?.aborted) throw new Error("下载已取消");
         console.error("Error fetching unlock url for download:", e);
       }
     }
 
     // 标准下载流程
-    const result = await songDownloadUrl(this.song.id, this.quality);
+    const result = await songDownloadUrl(this.song.id, this.quality, this.signal);
     if (result.code !== 200 || !result?.data?.url) {
       throw new Error(result.message || "获取下载链接失败");
     }
@@ -268,6 +281,7 @@ class DownloadManager {
   private activeDownloads: Set<number> = new Set();
   private maxConcurrent: number = 1;
   private initialized: boolean = false;
+  private abortControllers: Map<number, AbortController> = new Map();
 
   public init() {
     if (this.initialized) return;
@@ -326,10 +340,13 @@ class DownloadManager {
    */
   public removeDownload(id: number) {
     const dataStore = useDataStore();
-    // 如果正在下载，尝试取消（目前仅移除任务）
+    // 如果正在下载，中止请求
     if (this.activeDownloads.has(id)) {
-      // TODO: 实现取消正在进行的下载任务
-      // 暂时先从活动集合中移除，以释放下载槽位
+      const controller = this.abortControllers.get(id);
+      if (controller) {
+        controller.abort();
+        this.abortControllers.delete(id);
+      }
       this.activeDownloads.delete(id);
     }
     // 从队列中移除
@@ -406,6 +423,11 @@ class DownloadManager {
    */
   private async startTask(strategy: DownloadStrategy) {
     this.activeDownloads.add(strategy.id);
+    // 创建 AbortController 用于取消下载
+    const controller = new AbortController();
+    strategy.signal = controller.signal;
+    this.abortControllers.set(strategy.id, controller);
+
     const dataStore = useDataStore();
     dataStore.updateDownloadStatus(strategy.id, "downloading");
 
@@ -420,14 +442,21 @@ class DownloadManager {
       await strategy.postProcess();
       dataStore.removeDownloadingSong(strategy.id);
       window.$message.success(`${strategy.name} 下载完成`);
-    } catch (error: any) {
+    } catch (error: unknown) {
+      // 用户主动取消不显示错误提示
+      if (controller.signal.aborted) {
+        console.debug(`下载任务 ${strategy.name} (ID: ${strategy.id}) 已取消`);
+        return;
+      }
       console.error(`Error processing task ${strategy.name} (ID: ${strategy.id}):`, error);
-      if (error?.message) console.error("Error message:", error.message);
+      const message = error instanceof Error ? error.message : String(error);
+      if (message) console.error("Error message:", message);
 
       dataStore.markDownloadFailed(strategy.id);
-      window.$message.error(error.message || "下载出错");
+      window.$message.error(message || "下载出错");
     } finally {
       this.activeDownloads.delete(strategy.id);
+      this.abortControllers.delete(strategy.id);
       this.processQueue();
     }
   }

@@ -316,9 +316,6 @@ async function handleExportWav(
 
     const wavHeader = createWavHeader(props.sampleRate, props.channelCount, dataByteLength);
 
-    props.metadata.delete();
-    props.coverArt.delete();
-
     const blob = new Blob([wavHeader, ...chunks] as BlobPart[], {
       type: "audio/wav",
     });
@@ -337,6 +334,8 @@ async function handleExportWav(
       error: err.message,
     });
   } finally {
+    props.metadata.delete();
+    props.coverArt.delete();
     if (decoder) {
       decoder.close();
       decoder.delete();

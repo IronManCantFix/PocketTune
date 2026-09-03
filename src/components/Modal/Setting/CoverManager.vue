@@ -1,6 +1,6 @@
 <template>
   <div class="cover-manager">
-    <n-scrollbar style="max-height: 400px">
+    <n-scrollbar :style="{ maxHeight: 'min(400px, 50vh)' }">
       <div class="list">
         <n-card
           v-for="item in coverItems"

@@ -259,8 +259,12 @@ const getListData = async (id: number | string): Promise<SongType[]> => {
     grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
     gap: 20px;
     @media (max-width: 600px) {
-      grid-template-columns: repeat(3, 1fr);
+      grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
       gap: 12px;
+    }
+    @media (max-width: 380px) {
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
     }
   }
   .cover-item {
@@ -362,17 +366,27 @@ const getListData = async (id: number | string): Promise<SongType[]> => {
     .cover-data {
       display: flex;
       flex-direction: column;
+      min-width: 0;
       padding: 12px;
       .name {
         font-size: 16px;
         line-clamp: 2;
         -webkit-line-clamp: 2;
+        word-break: break-word;
       }
       .tip {
         font-size: 13px;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
       }
       .meta {
         font-size: 13px;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
         .count {
           &::after {
             content: "·";
@@ -383,6 +397,10 @@ const getListData = async (id: number | string): Promise<SongType[]> => {
       .artists {
         margin-top: 2px;
         font-size: 13px;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
         .ar {
           display: inline-flex;
           transition: opacity 0.3s;

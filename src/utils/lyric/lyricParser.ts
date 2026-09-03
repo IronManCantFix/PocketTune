@@ -26,6 +26,12 @@ const LINE_TIME_REGEX = /^\[(\d{2}):(\d{2})\.(\d{1,})\]/;
 const QRC_LINE_PATTERN = /^\[(\d+),(\d+)\](.*)$/;
 const QRC_WORD_PATTERN = /(.*?)\((\d+),(\d+)\)/g;
 
+// 逐字 LRC 解析正则 - 模块顶层预编译
+const WORD_BY_WORD_PATTERN = /\[(\d{2}):(\d{2})\.(\d{1,})\]([^[\]]*)/g;
+
+// 增强型 LRC 解析正则 - 模块顶层预编译
+const ENHANCED_WORD_PATTERN = /<(\d{2}):(\d{2})\.(\d{1,})>([^<]*)/g;
+
 const DEFAULT_WORD_DURATION = 1000;
 const ALIGN_TOLERANCE_MS = 300;
 
@@ -92,7 +98,6 @@ export const detectLrcFormat = (content: string): LrcFormat => {
 export const parseWordByWordLrc = (content: string): LyricLine[] => {
   const result: LyricLine[] = [];
   let prevLine: LyricLine | null = null;
-  const WORD_BY_WORD_PATTERN = /\[(\d{2}):(\d{2})\.(\d{1,})\]([^[\]]*)/g;
 
   for (const rawLine of content.split(/\r?\n/)) {
     const line = rawLine.trim();
@@ -159,7 +164,6 @@ export const parseWordByWordLrc = (content: string): LyricLine[] => {
 export const parseEnhancedLrc = (content: string): LyricLine[] => {
   const result: LyricLine[] = [];
   let prevLine: LyricLine | null = null;
-  const ENHANCED_WORD_PATTERN = /<(\d{2}):(\d{2})\.(\d{1,})>([^<]*)/g;
 
   for (const rawLine of content.split(/\r?\n/)) {
     const line = rawLine.trim();

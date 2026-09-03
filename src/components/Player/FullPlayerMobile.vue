@@ -280,6 +280,7 @@ const contentTransform = computed(() => {
     align-items: center;
     justify-content: flex-end;
     padding: 0 24px;
+    padding-top: env(safe-area-inset-top, 0px);
     z-index: 10;
     .btn {
       width: 40px;
@@ -334,22 +335,29 @@ const contentTransform = computed(() => {
           width: min(100%, 45vh);
           // height: min(85vw, 45vh);
           &.record {
-            width: 40vh;
+            width: min(85vw, 40vh);
             .cover-img {
-              width: 40vh;
-              height: 40vh;
-              min-width: 40vh;
+              width: min(85vw, 40vh);
+              height: min(85vw, 40vh);
+              min-width: 0;
             }
             .pointer {
               width: 10vh;
               top: -9.5vh;
             }
             @media (max-width: 512px) {
-              width: 36vh;
+              width: min(82vw, 36vh);
               .cover-img {
-                width: 36vh;
-                height: 36vh;
-                min-width: 36vh;
+                width: min(82vw, 36vh);
+                height: min(82vw, 36vh);
+                min-width: 0;
+              }
+            }
+            @media (max-height: 600px) {
+              width: min(70vw, 32vh);
+              .cover-img {
+                width: min(70vw, 32vh);
+                height: min(70vw, 32vh);
               }
             }
           }
@@ -511,14 +519,21 @@ const contentTransform = computed(() => {
           display: flex;
           flex-direction: column;
           justify-content: center;
+          overflow: hidden;
           .name {
             font-size: 18px;
             font-weight: bold;
             margin-bottom: 2px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
           }
           .artist {
             font-size: 13px;
             opacity: 0.6;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
           }
         }
         .action-btn {
@@ -554,7 +569,7 @@ const contentTransform = computed(() => {
   }
   .pagination {
     position: absolute;
-    bottom: 24px;
+    bottom: calc(24px + env(safe-area-inset-bottom, 0px));
     left: 0;
     width: 100%;
     display: flex;

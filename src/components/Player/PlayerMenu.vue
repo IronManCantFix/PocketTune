@@ -43,7 +43,6 @@ const { isFullscreen, toggle: toggleFullscreen } = useFullscreen();
   min-height: 80px;
   overflow: hidden;
   z-index: 100;
-  cursor: pointer;
   .menu-content {
     display: flex;
     flex-direction: row;
@@ -56,7 +55,6 @@ const { isFullscreen, toggle: toggleFullscreen } = useFullscreen();
     height: 80px;
     margin: 0 100px;
     flex: 1;
-    -webkit-app-region: drag;
   }
   .left,
   .right {

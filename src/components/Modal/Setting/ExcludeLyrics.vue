@@ -226,14 +226,18 @@ onMounted(() => {
       flex-direction: row;
       align-items: center;
       justify-content: space-between;
+      gap: 12px;
       padding: 16px;
     }
     .label {
       display: flex;
+      flex: 1 1 auto;
+      min-width: 0;
       flex-direction: column;
       padding-right: 20px;
       .name {
         font-size: 16px;
+        min-width: 0;
       }
     }
     .n-flex {
@@ -242,12 +246,17 @@ onMounted(() => {
     .set {
       justify-content: flex-end;
       width: 200px;
+      flex-shrink: 0;
       &.n-switch {
         width: max-content;
       }
       @media (max-width: 768px) {
         width: 140px;
         min-width: 140px;
+      }
+      @media (max-width: 480px) {
+        width: 120px;
+        min-width: 120px;
       }
     }
   }

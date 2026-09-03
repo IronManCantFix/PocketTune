@@ -24,6 +24,8 @@ class AudioManager extends TypedEventTarget<AudioEventMap> implements IPlaybackE
   private pendingEngine: IPlaybackEngine | null = null;
   /** 切换引擎的定时器 */
   private pendingSwitchTimer: ReturnType<typeof setTimeout> | null = null;
+  /** 旧引擎销毁定时器 */
+  private oldEngineDestroyTimer: ReturnType<typeof setTimeout> | null = null;
   /** 用于清理当前引擎的事件监听器 */
   private cleanupListeners: (() => void) | null = null;
   /** 是否正在进行 Crossfade (避免事件干扰) */
@@ -257,8 +259,19 @@ class AudioManager extends TypedEventTarget<AudioEventMap> implements IPlaybackE
     } else {
       commitSwitch();
     }
+    // 清理之前的旧引擎销毁定时器（避免重复销毁）
+    if (this.oldEngineDestroyTimer) {
+      clearTimeout(this.oldEngineDestroyTimer);
+      this.oldEngineDestroyTimer = null;
+    }
     // 销毁旧引擎
-    setTimeout(() => oldEngine.destroy(), options.duration * 1000 + 1000);
+    this.oldEngineDestroyTimer = setTimeout(
+      () => {
+        this.oldEngineDestroyTimer = null;
+        oldEngine.destroy();
+      },
+      options.duration * 1000 + 1000,
+    );
   }
 
   /**

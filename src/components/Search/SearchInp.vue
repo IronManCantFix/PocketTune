@@ -220,13 +220,20 @@ onMounted(() => {
 <style lang="scss" scoped>
 .search {
   position: absolute;
+  top: 50%;
+  // 使用 margin 垂直居中而非 transform，避免 transform 创建包含块导致 position: fixed 的子元素（遮罩/面板）无法覆盖视口
+  margin-top: -20px;
   left: 0;
   -webkit-app-region: no-drag;
+  z-index: 10;
   transition:
     left 0.3s,
-    width 0.3s;
+    width 0.3s,
+    top 0.3s,
+    right 0.3s,
+    z-index 0s;
   .search-input {
-    width: 200px;
+    width: clamp(160px, 22vw, 220px);
     height: 40px;
     border-radius: 50px;
     transition:
@@ -237,24 +244,44 @@ onMounted(() => {
       height: 100%;
       width: 100%;
     }
+    // 聚焦时隐藏 Naive UI 的默认深色描边（圆角底部会出现灰色），聚焦态已通过变宽与全局遮罩表达，无需额外描边
+    &:focus-within,
+    &.n-input--focus {
+      :deep(.n-input__border),
+      :deep(.n-input__state-border) {
+        border-color: transparent;
+        box-shadow: none;
+      }
+    }
   }
   &.focus {
+    z-index: 9999;
     .search-input {
-      width: 300px;
+      width: clamp(220px, 32vw, 320px);
     }
   }
   @media (max-width: 768px) {
-    width: calc(100% - 150px);
+    width: calc(100% - 100px);
+    max-width: calc(100vw - 120px);
     .search-input {
       width: 100%;
     }
     &.focus {
-      left: -52px;
-      width: calc(100% + 52px);
+      position: fixed;
+      top: calc(env(safe-area-inset-top, 0px) + 15px);
+      left: 16px;
+      right: 16px;
+      width: auto;
+      max-width: none;
+      margin-top: 0;
+      // 不能设置 transform（即便为平凡值），否则仍会构建包含块，使固定定位的遮罩无法覆盖全屏
       .search-input {
         width: 100%;
       }
     }
+  }
+  @media (max-width: 380px) {
+    width: calc(100% - 80px);
   }
   .search-mask {
     position: fixed;

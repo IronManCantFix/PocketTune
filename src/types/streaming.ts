@@ -23,7 +23,7 @@ export interface StreamingServerConfig {
   url: string;
   /** 用户名 */
   username: string;
-  /** 密码（明文存储） */
+  /** 密码（⚠️ 明文存储，存在安全风险，建议迁移至加密存储或 token 认证） */
   password: string;
   /** Jellyfin 专用: 认证 Token */
   accessToken?: string;

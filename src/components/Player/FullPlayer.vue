@@ -312,7 +312,7 @@ onBeforeUnmount(() => {
     justify-content: center;
     align-items: center;
     width: 100%;
-    height: calc(100vh - 160px);
+    height: calc(100dvh - 160px);
     transition:
       opacity 0.3s cubic-bezier(0.34, 1.56, 0.64, 1),
       transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);

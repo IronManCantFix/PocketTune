@@ -165,14 +165,12 @@ const { isSmallScreen } = useMobile();
 // 设置内容
 const setScrollbar = ref<InstanceType<typeof NScrollbar> | null>(null);
 
-// 移动端菜单显示状态
-const showLeftMenu = ref(true);
+// 移动端菜单显示状态（移动端默认隐藏，避免遮挡内容）
+const showLeftMenu = ref(!isSmallScreen.value);
 
 // 监听屏幕大小变化，非小屏时自动显示侧边栏
 watch(isSmallScreen, (small) => {
-  if (!small) {
-    showLeftMenu.value = true;
-  }
+  showLeftMenu.value = !small;
 });
 
 // 菜单数据
@@ -340,6 +338,7 @@ onMounted(() => {
     height: 100%;
     padding: 20px;
     background-color: var(--surface-container-hex);
+    flex-shrink: 0;
     .title {
       height: 60px;
       margin: 10px 0 20px 10px;
@@ -379,6 +378,7 @@ onMounted(() => {
   }
   .set-right {
     flex: 1;
+    min-width: 0;
     height: 100%;
     background-color: var(--background-hex);
     .mobile-title {
@@ -402,6 +402,7 @@ onMounted(() => {
       top: 0;
       z-index: 11;
       box-shadow: 2px 0 8px rgba(0, 0, 0, 0.15);
+      width: min(280px, 85vw);
     }
     .set-right {
       width: 100%;
@@ -414,7 +415,6 @@ onMounted(() => {
         .n-h1 {
           font-size: 24px;
           font-weight: bold;
-          margin-bottom: 0;
           line-height: normal;
           margin: 0;
         }
@@ -481,12 +481,15 @@ onMounted(() => {
       .label {
         display: flex;
         flex-direction: column;
+        flex: 1 1 auto;
+        min-width: 0;
         padding-right: 20px;
         .name {
           font-size: 16px;
           display: inline-flex;
           align-items: center;
           gap: 6px;
+          min-width: 0;
         }
       }
       .n-flex {
@@ -496,8 +499,10 @@ onMounted(() => {
         justify-content: flex-end;
         min-width: 200px;
         width: 200px;
+        flex-shrink: 0;
         &.n-switch {
           width: max-content;
+          min-width: auto;
         }
       }
     }
@@ -509,11 +514,12 @@ onMounted(() => {
         }
       }
       .set-item {
+        .label {
+          padding-right: 12px;
+        }
         .set {
-          @media (max-width: 768px) {
-            width: 140px;
-            min-width: 140px;
-          }
+          width: 140px;
+          min-width: 140px;
         }
       }
     }

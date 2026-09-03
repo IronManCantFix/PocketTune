@@ -84,11 +84,13 @@ const songList = computed(() => sampleSize(props.data, 3));
   .content {
     display: flex;
     width: 100%;
+    min-width: 0;
     .cover {
       position: relative;
       display: flex;
       justify-content: center;
       align-items: center;
+      flex-shrink: 0;
       aspect-ratio: 1/1;
       margin-right: 20px;
       .cover-list {
@@ -123,10 +125,12 @@ const songList = computed(() => sampleSize(props.data, 3));
       }
     }
     .info {
-      flex: 1;
+      flex: 1 1 auto;
+      min-width: 0;
       display: flex;
       flex-direction: column;
       justify-content: space-evenly;
+      overflow: hidden;
       &.center {
         align-items: center;
         text-align: center;
@@ -134,6 +138,36 @@ const songList = computed(() => sampleSize(props.data, 3));
       .name {
         font-size: 18px;
         font-weight: bold;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        line-clamp: 2;
+        -webkit-box-orient: vertical;
+      }
+      .desc {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        line-clamp: 2;
+        -webkit-box-orient: vertical;
+      }
+    }
+  }
+  @media (max-width: 480px) {
+    :deep(.n-card__content) {
+      padding: 12px;
+    }
+    .content {
+      .cover {
+        width: 56px;
+        margin-right: 12px;
+      }
+      .info {
+        .name {
+          font-size: 15px;
+        }
       }
     }
   }

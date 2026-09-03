@@ -1,7 +1,7 @@
 <template>
   <div class="discover-new">
-    <n-flex class="menu" justify="space-between">
-      <n-flex class="type">
+    <n-flex class="menu" justify="space-between" wrap>
+      <n-flex class="type" wrap>
         <n-tag
           v-for="(item, index) in newTypeNames"
           :key="index"
@@ -13,7 +13,7 @@
           {{ item }}
         </n-tag>
       </n-flex>
-      <n-flex class="area">
+      <n-flex class="area" wrap>
         <n-tag
           v-for="(item, index) in newAreaNames"
           :key="index"

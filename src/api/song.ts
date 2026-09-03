@@ -37,6 +37,7 @@ export const songUrl = (
     | "sky"
     | "dolby"
     | "jymaster" = "exhigh",
+  signal?: AbortSignal,
 ) => {
   // 杜比全景声使用旧版接口，并传入特殊参数
   if (level === "dolby") {
@@ -48,6 +49,7 @@ export const songUrl = (
         immerseType: "c51",
         timestamp: Date.now(),
       },
+      signal,
     });
   }
 
@@ -58,6 +60,7 @@ export const songUrl = (
       level,
       timestamp: Date.now(),
     },
+    signal,
   });
 };
 
@@ -68,12 +71,14 @@ export const unlockSongUrl = (
   server: SongUnlockServer,
   songName?: string,
   artist?: string,
+  signal?: AbortSignal,
 ) => {
   const params = server === SongUnlockServer.NETEASE ? { id } : { keyword, songName, artist };
   return request({
     baseURL: "/api/unblock",
     url: `/${server}`,
     params: { ...params, noCookie: true },
+    signal,
   });
 };
 
@@ -133,12 +138,17 @@ export const songLyricTTML = async (id: number) => {
  * @param level 播放音质等级, 分为 standard => 标准,higher => 较高, exhigh=>极高, lossless=>无损, hires=>Hi-Res, jyeffect => 高清环绕声, sky => 沉浸环绕声, `dolby` => `杜比全景声`, jymaster => 超清母带
  * @returns
  */
-export const songDownloadUrl = (id: number, level: keyof typeof songLevelData = "h") => {
+export const songDownloadUrl = (
+  id: number,
+  level: keyof typeof songLevelData = "h",
+  signal?: AbortSignal,
+) => {
   // 获取对应音质
   const levelName = songLevelData[level].level;
   return request({
     url: "/song/download/url/v1",
     params: { id, level: levelName, timestamp: Date.now() },
+    signal,
   });
 };
 

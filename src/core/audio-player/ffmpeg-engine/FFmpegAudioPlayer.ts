@@ -118,8 +118,11 @@ export class FFmpegAudioPlayer extends BaseAudioPlayer {
     );
   }
 
+  /** 最后的错误码 */
+  private _lastErrorCode: number = 0;
+
   public getErrorCode(): number {
-    return 0;
+    return this._lastErrorCode;
   }
 
   private requestWorker<T = void>(
@@ -199,6 +202,7 @@ export class FFmpegAudioPlayer extends BaseAudioPlayer {
     } catch (e) {
       const err = toError(e);
       console.error("[Player] Load error:", err);
+      this._lastErrorCode = AudioErrorCode.DECODE;
       this.dispatch("error", {
         originalEvent: new Event("error"),
         errorCode: AudioErrorCode.DECODE,
@@ -207,8 +211,7 @@ export class FFmpegAudioPlayer extends BaseAudioPlayer {
   }
 
   private async loadSrc(url: string) {
-    this.reset();
-    this.dispatch("loadstart");
+    // load() 已调用 reset()，此处无需重复
     try {
       const response = await fetch(url, { method: "HEAD" });
       if (!response.ok) {
@@ -247,6 +250,7 @@ export class FFmpegAudioPlayer extends BaseAudioPlayer {
     } catch (e) {
       const err = toError(e);
       console.error("[Player] LoadSrc error:", err);
+      this._lastErrorCode = 2;
       this.dispatch("error", { originalEvent: new Event("error"), errorCode: 2 });
     }
   }
@@ -315,6 +319,7 @@ export class FFmpegAudioPlayer extends BaseAudioPlayer {
         return;
       } else {
         console.error("[Player] Stream error:", err);
+        this._lastErrorCode = 2;
         this.dispatch("error", { originalEvent: new Event("error"), errorCode: 2 });
       }
     }

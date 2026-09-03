@@ -43,7 +43,6 @@
           :options="variantOptions"
           class="set"
           size="small"
-          style="width: 140px"
           @update:value="themeGlobalColorChange(true)"
         />
       </n-card>
@@ -147,7 +146,7 @@
           :max="2"
           :step="0.05"
           :format-tooltip="(v: number) => `${v.toFixed(2)}x`"
-          style="width: 120px"
+          class="set"
         />
       </n-card>
       <n-card class="set-item">
@@ -161,7 +160,7 @@
           :max="95"
           :step="5"
           :format-tooltip="(v: number) => `${v}%`"
-          style="width: 120px"
+          class="set"
         />
       </n-card>
       <n-card class="set-item">
@@ -175,7 +174,7 @@
           :max="20"
           :step="1"
           :format-tooltip="(v: number) => `${v}px`"
-          style="width: 120px"
+          class="set"
         />
       </n-card>
     </div>
@@ -394,23 +393,50 @@ const clearBackgroundImage = async () => {
       display: flex;
       align-items: center;
       justify-content: space-between;
+      gap: 12px;
       padding: 8px 12px;
     }
     .label {
       display: flex;
       flex-direction: column;
+      flex: 1 1 auto;
+      min-width: 0;
+      padding-right: 8px;
       .name {
         font-size: 14px;
+        min-width: 0;
       }
       .tip {
         font-size: 12px;
         margin-top: 2px;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        line-clamp: 2;
+        -webkit-box-orient: vertical;
       }
     }
     .bg-actions {
       display: flex;
       align-items: center;
       gap: 8px;
+      flex-shrink: 0;
+    }
+  }
+  // 通用控件样式（slider/select）
+  :deep(.set) {
+    width: 160px;
+    flex-shrink: 0;
+  }
+  // 开关保持自身宽度，避免被 .set 拉宽
+  :deep(.n-switch.set) {
+    width: max-content;
+  }
+  @media (max-width: 768px) {
+    :deep(.set) {
+      width: 130px;
     }
   }
 }

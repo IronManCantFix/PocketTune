@@ -343,6 +343,7 @@ const handleTabChange = (value: "songs" | "comments") => {
 
 <style lang="scss" scoped>
 .list-detail {
+  position: relative;
   display: flex;
   flex-direction: column;
   .detail {
@@ -485,11 +486,20 @@ const handleTabChange = (value: "songs" | "comments") => {
           }
           .tags {
             margin-left: 4px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            max-width: 100%;
+            overflow: hidden;
             .n-tag {
               font-size: 13px;
               padding: 0 16px;
               line-height: 0;
               cursor: pointer;
+              max-width: 160px;
+              overflow: hidden;
+              text-overflow: ellipsis;
+              white-space: nowrap;
               transition:
                 transform 0.3s,
                 background-color 0.3s,
@@ -518,13 +528,16 @@ const handleTabChange = (value: "songs" | "comments") => {
         }
         .search {
           height: 40px;
-          width: 130px;
+          min-width: 130px;
+          max-width: 200px;
+          width: auto;
           display: flex;
           align-items: center;
           border-radius: 25px;
           transition: all 0.3s var(--n-bezier);
           &.n-input--focus {
-            width: 200px;
+            max-width: 200px;
+            width: auto;
           }
         }
         .tabs {

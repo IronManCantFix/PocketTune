@@ -216,7 +216,7 @@ onBeforeUnmount(() => {
   }
   &.record {
     position: relative;
-    max-width: 46vh;
+    max-width: min(46vh, 400px);
     margin-bottom: 4%;
     .pointer {
       position: absolute;
@@ -300,9 +300,6 @@ onBeforeUnmount(() => {
           #555
         );
       background-clip: content-box;
-      // width: 46vh;
-      // height: 46vh;
-      // min-width: 46vh;
       width: 100%;
       height: 100%;
       display: flex;

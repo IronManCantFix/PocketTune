@@ -357,6 +357,12 @@ onMounted(() => {
   display: grid !important;
   grid-template-columns: repeat(3, 1fr) !important;
   gap: 12px !important;
+  @media (max-width: 768px) {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+  @media (max-width: 480px) {
+    grid-template-columns: 1fr !important;
+  }
 }
 .link-item {
   border-radius: 8px;

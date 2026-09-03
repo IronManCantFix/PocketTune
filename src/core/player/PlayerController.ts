@@ -554,6 +554,9 @@ class PlayerController {
     }
   }
 
+  /** 音频事件处理器引用，用于销毁时清理 */
+  private _audioEventHandlers: Map<string, EventListener> = new Map();
+
   /**
    * 统一音频事件绑定
    */
@@ -565,62 +568,70 @@ class PlayerController {
     const audioManager = useAudioManager();
 
     // 加载状态
-    audioManager.addEventListener("loadstart", () => {
+    const onLoadStart = () => {
       statusStore.playLoading = true;
-    });
+    };
+    audioManager.addEventListener("loadstart", onLoadStart);
+    this._audioEventHandlers.set("loadstart", onLoadStart);
 
     // 加载完成
-    audioManager.addEventListener("canplay", () => {
-      // 结束加载
+    const onCanPlay = () => {
       statusStore.playLoading = false;
-      // 恢复 EQ
       if (statusStore.eqEnabled) {
         const bands = statusStore.eqBands;
         if (bands && bands.length === 10) {
           bands.forEach((val, idx) => audioManager.setFilterGain(idx, val));
         }
       }
-    });
+    };
+    audioManager.addEventListener("canplay", onCanPlay);
+    this._audioEventHandlers.set("canplay", onCanPlay);
+
     // 播放开始
-    audioManager.addEventListener("play", () => {
+    const onPlay = () => {
       const { name, artist } = getPlayerInfoObj() || {};
       const playTitle = `${name} - ${artist}`;
-      // 更新状态
       statusStore.playStatus = true;
       window.document.title = `${playTitle} | PocketTune`;
-      // 只有真正播放了才重置重试计数
       if (this.retryInfo.count > 0) this.retryInfo.count = 0;
-      // 注意：failSkipCount 的重置移至 onTimeUpdate，确保有实际进度
-      // Last.fm Scrobbler
       lastfmScrobbler.resume();
       console.log(`▶️ [${musicStore.playSong?.id}] 歌曲播放:`, name);
-    });
+    };
+    audioManager.addEventListener("play", onPlay);
+    this._audioEventHandlers.set("play", onPlay);
+
     // 暂停
-    audioManager.addEventListener("pause", () => {
+    const onPause = () => {
       statusStore.playStatus = false;
       useAutomixManager().resetAutomixScheduling("IDLE");
       window.document.title = "PocketTune";
       lastfmScrobbler.pause();
       console.log(`⏸️ [${musicStore.playSong?.id}] 歌曲暂停`);
-    });
+    };
+    audioManager.addEventListener("pause", onPause);
+    this._audioEventHandlers.set("pause", onPause);
+
     // 拖动进度条
-    audioManager.addEventListener("seeking", () => {
+    const onSeeking = () => {
       useAutomixManager().resetAutomixScheduling("MONITORING");
-    });
+    };
+    audioManager.addEventListener("seeking", onSeeking);
+    this._audioEventHandlers.set("seeking", onSeeking);
+
     // 播放结束
-    audioManager.addEventListener("ended", () => {
+    const onEnded = () => {
       if (this.isTransitioning) return;
       useAutomixManager().resetAutomixScheduling("IDLE");
       console.log(`⏹️ [${musicStore.playSong?.id}] 歌曲结束`);
       lastfmScrobbler.stop();
-      // 检查定时关闭
       if (this.checkAutoClose()) return;
-      // 自动播放下一首
       this.nextOrPrev("next", true, true);
-    });
+    };
+    audioManager.addEventListener("ended", onEnded);
+    this._audioEventHandlers.set("ended", onEnded);
+
     // 进度更新
     this.onTimeUpdate = throttle(() => {
-      // AB 循环
       const { enable, pointA, pointB } = statusStore.abLoop;
       if (enable && pointA !== null && pointB !== null) {
         if (audioManager.currentTime >= pointB) {
@@ -631,7 +642,6 @@ class PlayerController {
       const currentTime = Math.floor(rawTime * 1000);
       const duration = Math.floor(audioManager.duration * 1000) || statusStore.duration;
       useAutomixManager().updateAutomixMonitoring();
-      // 计算歌词索引
       const songId = musicStore.playSong?.id;
       const offset = statusStore.getSongOffset(songId);
       const useYrc = !!(settingStore.showWordLyrics && musicStore.songLyric.yrcData?.length);
@@ -642,26 +652,38 @@ class PlayerController {
         rawLyrics = toRaw(musicStore.songLyric.lrcData);
       }
       const lyricIndex = calculateLyricIndex(currentTime, rawLyrics, offset);
-      // 更新状态
       statusStore.$patch({
         currentTime,
         duration,
         progress: calculateProgress(currentTime, duration),
         lyricIndex,
       });
-      // 成功播放一段距离后，重置失败跳过计数
       if (currentTime > 500 && this.failSkipCount > 0) {
         this.failSkipCount = 0;
       }
-      // 更新系统 MediaSession
       mediaSessionManager.updateState(duration, currentTime);
     }, 200);
     audioManager.addEventListener("timeupdate", this.onTimeUpdate);
+    this._audioEventHandlers.set("timeupdate", this.onTimeUpdate as unknown as EventListener);
+
     // 错误处理
-    audioManager.addEventListener("error", (e) => {
-      const errCode = e.detail.errorCode;
+    const onError = (e: Event) => {
+      const errCode = (e as CustomEvent).detail?.errorCode;
       this.handlePlaybackError(errCode, this.getSeek());
+    };
+    audioManager.addEventListener("error", onError);
+    this._audioEventHandlers.set("error", onError);
+  }
+
+  /**
+   * 清理音频事件绑定
+   */
+  private unbindAudioEvents() {
+    const audioManager = useAudioManager();
+    this._audioEventHandlers.forEach((handler, event) => {
+      audioManager.removeEventListener(event, handler);
     });
+    this._audioEventHandlers.clear();
   }
 
   /**
@@ -702,7 +724,7 @@ class PlayerController {
       return;
     }
     // 格式不支持
-    if (errCode === AudioErrorCode.SRC_NOT_SUPPORTED || errCode === 9) {
+    if (errCode === AudioErrorCode.SRC_NOT_SUPPORTED || errCode === AudioErrorCode.FALLBACK_ERROR) {
       console.warn(`⚠️ 音频格式不支持 (Code: ${errCode}), 跳过`);
       window.$message.error("该歌曲无法播放，已自动跳过");
       statusStore.playLoading = false;
@@ -1252,6 +1274,7 @@ class PlayerController {
       // 到达时间
       if (remaining <= 0) {
         clearInterval(this.autoCloseInterval);
+        this.autoCloseInterval = undefined;
         if (!statusStore.autoClose.waitSongEnd) {
           this.pause();
           statusStore.autoClose.enable = false;
@@ -1406,6 +1429,28 @@ class PlayerController {
    */
   public playModeSyncIpc() {
     // web 环境由 MediaSession 自动处理，无需额外同步
+  }
+  /**
+   * 销毁播放器控制器，释放所有资源
+   */
+  public destroy(): void {
+    // 清理自动关闭定时器
+    if (this.autoCloseInterval) {
+      clearInterval(this.autoCloseInterval);
+      this.autoCloseInterval = undefined;
+    }
+    // 清理速率渐变动画帧
+    if (this.rateRampFrame) {
+      cancelAnimationFrame(this.rateRampFrame);
+      this.rateRampFrame = undefined;
+    }
+    // 清理速率重置定时器
+    if (this.rateResetTimer) {
+      clearTimeout(this.rateResetTimer);
+      this.rateResetTimer = undefined;
+    }
+    // 清理音频事件监听器
+    this.unbindAudioEvents();
   }
 }
 

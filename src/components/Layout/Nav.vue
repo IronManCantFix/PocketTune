@@ -1,5 +1,18 @@
 <template>
   <n-layout-header class="nav">
+    <!-- 移动端菜单按钮（左侧） -->
+    <n-button
+      v-if="!isDesktop"
+      :focusable="false"
+      tertiary
+      circle
+      class="mobile-menu-btn"
+      @click="showAside = !showAside"
+    >
+      <template #icon>
+        <SvgIcon name="Menu" />
+      </template>
+    </n-button>
     <!-- 页面导航 -->
     <n-flex class="page-control">
       <Logo v-if="!isDesktop" :size="40" @click="router.push('/')" />
@@ -33,31 +46,24 @@
             </template>
           </n-button>
         </n-dropdown>
-        <!-- 移动端菜单 -->
-        <n-button
-          v-if="!isDesktop"
-          :focusable="false"
-          tertiary
-          circle
-          @click="showAside = !showAside"
-        >
-          <template #icon>
-            <SvgIcon name="Menu" />
-          </template>
-        </n-button>
-        <n-drawer v-model:show="showAside" :width="240" placement="left">
-          <n-drawer-content :body-content-style="{ padding: 0 }" :native-scrollbar="false">
-            <template #header>
-              <n-flex align="center" justify="center" class="aside-logo">
-                <Logo />
-                <n-text>PocketTune</n-text>
-              </n-flex>
-            </template>
-            <Menu @menu-click="showAside = false" />
-          </n-drawer-content>
-        </n-drawer>
       </n-flex>
     </n-flex>
+    <!-- 抽屉 -->
+    <n-drawer v-model:show="showAside" :width="240" placement="left">
+      <n-drawer-content
+        :body-content-style="{ padding: 0 }"
+        :native-scrollbar="false"
+        :style="{ paddingTop: 'env(safe-area-inset-top, 0px)' }"
+      >
+        <template #header>
+          <n-flex align="center" class="aside-logo">
+            <Logo />
+            <n-text>PocketTune</n-text>
+          </n-flex>
+        </template>
+        <Menu @menu-click="showAside = false" />
+      </n-drawer-content>
+    </n-drawer>
   </n-layout-header>
 </template>
 
@@ -129,14 +135,21 @@ const setSelect = (key: string) => {
   align-items: center;
   justify-content: space-between;
   // 固定高度，移动端搜索栏紧贴屏幕顶部，避免顶部出现空洞
-  height: 70px;
+  height: calc(70px + env(safe-area-inset-top, 0px));
   padding: 0 1rem;
+  padding-top: env(safe-area-inset-top, 0px);
   background-color: transparent;
-  -webkit-app-region: drag;
+  // 左侧控制区域宽度变量，供搜索框计算可用空间
+  --nav-page-control-width: 180px;
+  --nav-page-control-max-width: 220px;
+  --nav-page-control-width-small: 160px;
   .n-button {
     width: 40px;
     height: 40px;
-    -webkit-app-region: no-drag;
+  }
+  .mobile-menu-btn {
+    flex-shrink: 0;
+    margin-right: 8px;
   }
   .nav-main {
     position: relative;
@@ -153,11 +166,16 @@ const setSelect = (key: string) => {
 }
 .aside-logo {
   .n-text {
-    width: 90px;
+    // 不锁宽，品牌名放不下时不换行而是整体靠左展示
+    flex: 1 1 auto;
+    min-width: 0;
     font-size: 22px;
     font-family: "logo";
     margin-top: 2px;
     line-height: 40px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 }
 </style>

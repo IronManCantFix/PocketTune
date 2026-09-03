@@ -58,7 +58,6 @@ const getSearchResult = async () => {
 // 列表触底
 const reachBottom = () => {
   if (hasMore.value) {
-    console.log("加载");
     searchOffset.value += 50;
     getSearchResult();
   } else {

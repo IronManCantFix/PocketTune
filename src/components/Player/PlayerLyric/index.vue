@@ -1,10 +1,10 @@
 <template>
-  <div class="player-lyric">
+  <div class="player-lyric" @click="toggleMenuOnMobile">
     <!-- 歌词内容 -->
     <AMLyric v-if="settingStore.useAMLyrics" :currentTime="playSeek" />
     <DefaultLyric v-else :currentTime="playSeek" />
     <!-- 歌词菜单 -->
-    <n-flex :class="['lyric-menu', { show: statusStore.playerMetaShow }]" justify="center" vertical>
+    <n-flex :class="['lyric-menu', { show: menuVisible }]" justify="center" vertical>
       <div
         v-if="settingStore.fullscreenPlayerElements.copyLyric"
         class="menu-icon"
@@ -93,11 +93,33 @@
 import { usePlayerController } from "@/core/player/PlayerController";
 import { useMusicStore, useSettingStore, useStatusStore } from "@/stores";
 import { openSetting, openCopyLyrics } from "@/utils/modal";
+import { useMobile } from "@/composables/useMobile";
 
 const musicStore = useMusicStore();
 const settingStore = useSettingStore();
 const statusStore = useStatusStore();
 const player = usePlayerController();
+
+// 是否为小屏幕（移动端）
+const { isSmallScreen } = useMobile();
+
+// 菜单可见性：桌面端跟随 playerMetaShow，移动端通过点击切换
+const menuVisible = computed(() => {
+  if (isSmallScreen.value) {
+    return mobileMenuVisible.value;
+  }
+  return statusStore.playerMetaShow;
+});
+
+// 移动端菜单显隐状态
+const mobileMenuVisible = ref(false);
+
+// 移动端点击切换菜单
+const toggleMenuOnMobile = () => {
+  if (isSmallScreen.value) {
+    mobileMenuVisible.value = !mobileMenuVisible.value;
+  }
+};
 
 /**
  * 当前歌曲 id

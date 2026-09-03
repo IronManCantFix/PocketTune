@@ -230,7 +230,8 @@ watchDebounced(
   position: absolute;
   left: 0;
   top: 50px;
-  width: 300px;
+  width: clamp(280px, 28vw, 320px);
+  max-width: calc(100vw - 32px);
   border-radius: 8px;
   overflow: hidden;
   max-height: calc(100vh - 160px);
@@ -246,7 +247,12 @@ watchDebounced(
     }
   }
   @media (max-width: 768px) {
-    width: 100%;
+    width: calc(100vw - 32px);
+    // 移动端限制面板高度为视口高度的 2/3
+    max-height: calc(100dvh * 2 / 3);
+    :deep(.scrollbar) {
+      max-height: calc(100dvh * 2 / 3);
+    }
   }
   .direct {
     display: flex;

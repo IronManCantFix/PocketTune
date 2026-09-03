@@ -13,10 +13,7 @@
         :update-value-on-input="false"
         :min="2"
         :max="9999"
-        :style="{
-          width: cacheLimited ? '55%' : '0%',
-          transition: 'width 0.3s',
-        }"
+        :style="inputNumberStyle"
         @update:value="onUpdateLimit"
       />
       <n-select
@@ -25,10 +22,7 @@
           { label: '不限制', value: 0 },
           { label: cacheLimited === 0 ? '自定义大小 (GB)' : 'GB', value: 1 },
         ]"
-        :style="{
-          width: cacheLimited ? '45%' : '100%',
-          transition: 'width 0.3s',
-        }"
+        :style="selectStyle"
         @update:value="onUpdateLimited"
       />
     </n-input-group>
@@ -42,6 +36,18 @@ defineProps<{ item?: SettingItem }>();
 
 const cacheLimit = ref<number>(10);
 const cacheLimited = ref<number>(1);
+
+// 输入框样式
+const inputNumberStyle = computed(() => ({
+  width: cacheLimited.value ? "55%" : "0%",
+  transition: "width 0.3s",
+}));
+
+// 选择器样式
+const selectStyle = computed(() => ({
+  width: cacheLimited.value ? "45%" : "100%",
+  transition: "width 0.3s",
+}));
 
 // 保存缓存上限配置
 const changeCacheLimit = (value: number) => {
@@ -77,3 +83,21 @@ onMounted(() => {
   }
 });
 </script>
+
+<style lang="scss" scoped>
+.set {
+  width: 100%;
+}
+
+/* 移动端纵向堆叠布局 */
+@media (max-width: 480px) {
+  .set {
+    flex-direction: column;
+    gap: 8px;
+
+    :deep(> *) {
+      width: 100% !important;
+    }
+  }
+}
+</style>

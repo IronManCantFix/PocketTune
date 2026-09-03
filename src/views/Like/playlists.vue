@@ -55,9 +55,6 @@ const changeType = (index: number) => (plTypeChoose.value = index);
   .n-tag {
     font-size: 14px;
     padding: 0 16px;
-    &.choose {
-      background-color: rgba(var(--primary), 0.14);
-    }
   }
 }
 </style>

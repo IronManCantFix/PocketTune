@@ -199,4 +199,22 @@ onBeforeUnmount(pauseCheck);
     margin-bottom: 12px;
   }
 }
+
+// 移动端适配：二维码容器缩小
+@media (max-width: 768px) {
+  .login-qrcode {
+    .qr-img {
+      width: 160px;
+      height: 160px;
+      .qr {
+        .n-qr-code {
+          height: 160px;
+          width: 160px;
+          min-height: 160px;
+          min-width: 160px;
+        }
+      }
+    }
+  }
+}
 </style>

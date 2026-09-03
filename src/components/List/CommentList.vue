@@ -234,7 +234,13 @@ const handleHug = debounce(async (item: CommentType) => {
       align-items: center;
       min-width: 60px;
       width: 60px;
+      flex-shrink: 0;
       margin-right: 12px;
+      @media (max-width: 480px) {
+        min-width: 48px;
+        width: 48px;
+        margin-right: 8px;
+      }
       .avatar {
         position: relative;
         display: flex;
@@ -272,8 +278,13 @@ const handleHug = debounce(async (item: CommentType) => {
       display: flex;
       flex-direction: column;
       flex: 1;
+      min-width: 0;
       width: 100%;
+      overflow: hidden;
       .content {
+        min-width: 0;
+        overflow-wrap: anywhere;
+        word-break: break-word;
         .name {
           font-weight: bold;
           cursor: pointer;
@@ -284,6 +295,8 @@ const handleHug = debounce(async (item: CommentType) => {
         .text {
           white-space: pre-wrap;
           user-select: text;
+          overflow-wrap: anywhere;
+          word-break: break-word;
         }
       }
       .reply {
@@ -293,25 +306,43 @@ const handleHug = debounce(async (item: CommentType) => {
         font-size: 13px;
         margin-top: 6px;
         background-color: rgba(var(--main-cover-color, var(--primary)), 0.12);
+        overflow: hidden;
+        overflow-wrap: anywhere;
+        word-break: break-word;
         .text {
           white-space: pre-wrap;
           user-select: text;
+          overflow-wrap: anywhere;
+          word-break: break-word;
         }
       }
       .meta {
         padding-top: 12px;
         margin-top: auto;
+        flex-wrap: wrap;
+        gap: 4px 12px;
         .item {
           display: flex;
           align-items: center;
+          min-width: 0;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
           .n-icon {
             font-size: 16px;
             margin-right: 4px;
+            flex-shrink: 0;
+          }
+          .n-text {
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
           }
         }
         .hug {
           margin-left: auto;
           cursor: pointer;
+          flex-shrink: 0;
           &:hover {
             .n-icon {
               color: var(--primary-hex);
@@ -323,6 +354,7 @@ const handleHug = debounce(async (item: CommentType) => {
         }
         .like {
           cursor: pointer;
+          flex-shrink: 0;
           &:hover {
             .n-icon,
             .n-text {

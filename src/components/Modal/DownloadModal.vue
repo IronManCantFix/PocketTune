@@ -24,7 +24,7 @@
       >
         <n-collapse-item title="音质选择" name="level">
           <n-radio-group v-model:value="selectedQuality" name="quality">
-            <n-flex>
+            <n-flex wrap>
               <n-radio v-for="(item, index) in qualityOptions" :key="index" :value="item.value">
                 <n-flex>
                   <n-text class="name">{{ item.label }}</n-text>

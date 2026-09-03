@@ -1,4 +1,4 @@
-import { Ref, WritableComputedRef, MaybeRefOrGetter } from "vue";
+import { type Component, type Ref, type WritableComputedRef, type MaybeRefOrGetter } from "vue";
 import { SelectOption } from "naive-ui";
 
 /**
@@ -69,7 +69,7 @@ export interface SettingItem {
    * 显示在标题下方的辅助说明文字
    * 支持字符串或渲染函数（可以使用 h 函数渲染复杂内容）
    */
-  description?: MaybeRefOrGetter<string> | (() => any);
+  description?: MaybeRefOrGetter<string> | (() => unknown);
 
   /**
    * 搜索关键词
@@ -84,26 +84,26 @@ export interface SettingItem {
    * 可以是 Vue 的 ref 或 computed
    * 如果提供了 `value`，通常不需要再提供 `get` 和 `set`
    */
-  value?: WritableComputedRef<any> | Ref<any>;
+  value?: WritableComputedRef<unknown> | Ref<unknown>;
 
   /**
    * 自定义 Getter
    * 当无法直接传递 ref 时使用，用于获取当前值
    */
-  get?: () => any;
+  get?: () => unknown;
 
   /**
    * 自定义 Setter
    * 当无法直接传递 ref 时使用，用于更新值
    */
-  set?: (value: any) => void;
+  set?: (value: unknown) => void;
 
   /**
    * 默认值
    * 用于显示“恢复默认”按钮
    * 当当前值与默认值不同时，显示恢复按钮
    */
-  defaultValue?: any;
+  defaultValue?: unknown;
 
   /**
    * 是否显示
@@ -211,13 +211,13 @@ export interface SettingItem {
    * 仅当 `type` 为 `custom` 时有效
    * 直接传入 import 的 .vue 组件对象
    */
-  component?: any;
+  component?: Component;
 
   /**
    * 传递给组件的 Props
    * 用于 `type` 为 `custom` 时传递 props，或覆盖内置组件的默认 props
    */
-  componentProps?: Record<string, any>;
+  componentProps?: Record<string, unknown>;
 
   /**
    * 操作回调
@@ -225,7 +225,7 @@ export interface SettingItem {
    * - 对于 `color-picker`: 颜色选择完成时触发
    * - 对于其他组件: 通常不需要，值变动由 `value` 绑定处理
    */
-  action?: (value?: any) => void;
+  action?: (value?: unknown) => void;
 
   /**
    * 额外的操作按钮
@@ -248,7 +248,7 @@ export interface SettingItem {
      * 强制显示的值
      * 当条件满足时，显示的值
      */
-    forcedValue?: MaybeRefOrGetter<any>;
+    forcedValue?: MaybeRefOrGetter<unknown>;
     /**
      * 强制显示的标题
      * 当条件满足时，显示的标题文字
@@ -260,7 +260,7 @@ export interface SettingItem {
      * 当条件满足时，显示的描述文字
      * @see SettingItem.description
      */
-    forcedDescription?: MaybeRefOrGetter<string> | (() => any);
+    forcedDescription?: MaybeRefOrGetter<string> | (() => unknown);
   };
 
   // --- 嵌套子项 (Nested Children) ---

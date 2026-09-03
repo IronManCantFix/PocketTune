@@ -21,7 +21,6 @@
       'lyric',
       settingStore.playerType,
       settingStore.lyricsPosition,
-      settingStore.lyricsPosition,
       {
         pure: statusStore.pureLyricMode,
         'align-right': settingStore.lyricAlignRight,
@@ -556,7 +555,7 @@ onBeforeUnmount(() => {
     height: 100%;
     overflow-y: auto;
     overflow-x: hidden;
-    padding-left: var(--lrc-left-padding, 10px);
+    padding-left: min(var(--lrc-left-padding, 10px), 30%);
     padding-right: 80px;
     box-sizing: border-box;
     /* 隐藏滚动条 */
@@ -577,8 +576,7 @@ onBeforeUnmount(() => {
       align-items: flex-end;
     }
     &:last-child {
-      height: 0;
-      padding-top: 100%;
+      height: 50vh;
     }
   }
   .lyric-content {

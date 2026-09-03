@@ -46,7 +46,7 @@
     <n-modal
       v-model:show="catChangeShow"
       display-directive="show"
-      style="width: 600px"
+      :style="{ width: 'min(600px, calc(100vw - 32px))' }"
       preset="card"
     >
       <template #header>
@@ -193,6 +193,9 @@ onMounted(() => {
       :deep(.n-tabs-rail) {
         outline: 1px solid var(--n-tab-color-segment);
       }
+    }
+    @media (max-width: 768px) {
+      margin-top: 12px;
     }
   }
 }

@@ -14,7 +14,6 @@ const getReplacementConfig = () => {
 
   let startStr = " - ";
   const endStr = " ";
-  const isEnclosure = false;
 
   // 预设模式
   if (preset === "angleBrackets") {
@@ -36,7 +35,7 @@ const getReplacementConfig = () => {
   }
 
   // 默认 dash 模式
-  return { startStr, endStr, isEnclosure };
+  return { startStr, endStr, isEnclosure: false };
 };
 
 /**
