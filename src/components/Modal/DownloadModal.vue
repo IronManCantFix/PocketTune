@@ -18,7 +18,7 @@
         <SongDataCard v-if="!isBatch && songs[0]" :data="songs[0]" />
       </n-flex>
       <n-collapse
-        :default-expanded-names="['level', 'path']"
+        :default-expanded-names="['level']"
         arrow-placement="right"
         style="margin-top: 20px"
       >
@@ -37,21 +37,6 @@
             注意：如果歌曲没有对应的音质，将自动下载最高可用音质
           </n-text>
         </n-collapse-item>
-        <n-collapse-item v-if="isElectron" title="下载路径" name="path">
-          <n-input-group>
-            <n-input :value="downloadPath || '未配置下载目录'" disabled>
-              <template #prefix>
-                <SvgIcon name="Folder" />
-              </template>
-            </n-input>
-            <n-button type="primary" strong secondary @click="openSetting('local')">
-              <template #icon>
-                <SvgIcon name="Settings" />
-              </template>
-              下载设置
-            </n-button>
-          </n-input-group>
-        </n-collapse-item>
       </n-collapse>
       <template v-if="isBatch">
         <n-text depth="3" style="font-size: 12px; margin-top: 12px; display: block">
@@ -61,9 +46,7 @@
       <!-- 按钮 -->
       <n-flex class="menu" justify="end" style="margin-top: 20px">
         <n-button strong secondary @click="cancel"> 取消 </n-button>
-        <n-button type="primary" :disabled="!canDownload" @click="handleConfirm">
-          添加下载
-        </n-button>
+        <n-button type="primary" @click="handleConfirm"> 添加下载 </n-button>
       </n-flex>
     </n-collapse-transition>
   </div>
@@ -74,8 +57,6 @@ import type { SongType, SongLevelType } from "@/types/main";
 import { useSettingStore } from "@/stores";
 import { songLevelData, getSongLevelsData, AI_AUDIO_LEVELS } from "@/utils/meta";
 import { formatFileSize } from "@/utils/helper";
-import { openSetting } from "@/utils/modal";
-import { isElectron } from "@/utils/env";
 import { songDetail } from "@/api/song";
 import { formatSongsList } from "@/utils/format";
 import { pick } from "lodash-es";
@@ -100,13 +81,6 @@ const isBatch = computed(() => songs.value.length > 1);
 const isCloudSong = computed(() => songs.value.some((song) => song.pc));
 
 const selectedQuality = ref<SongLevelType>(props.quality || settingStore.downloadSongLevel || "h");
-const downloadPath = computed(() => settingStore.downloadPath);
-
-// 是否可以下载（需要配置下载目录）
-const canDownload = computed(() => {
-  if (!isElectron) return true;
-  return !!downloadPath.value;
-});
 
 // 音质选项
 const qualityOptions = computed(() => {
@@ -144,11 +118,6 @@ const getSongDetail = async () => {
 
 // 确认下载
 const handleConfirm = () => {
-  if (!canDownload.value) {
-    window.$message.warning("请先配置下载目录");
-    return;
-  }
-
   if (songs.value.length === 0) {
     window.$message.warning("没有可下载的歌曲");
     return;

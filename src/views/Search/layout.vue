@@ -84,14 +84,29 @@ watch(
       font-weight: bold;
       margin-right: 8px;
       line-height: normal;
+      word-break: break-all;
     }
     .n-text {
       display: inline-block;
     }
   }
+  .tabs {
+    overflow-x: auto;
+    flex-shrink: 0;
+  }
   .router-view {
     flex: 1;
     overflow: hidden;
+  }
+  @media (max-width: 768px) {
+    .title {
+      margin-top: 8px;
+      margin-bottom: 8px;
+      font-size: 16px;
+      .keyword {
+        font-size: 24px;
+      }
+    }
   }
 }
 </style>

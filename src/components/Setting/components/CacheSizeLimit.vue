@@ -43,8 +43,9 @@ defineProps<{ item?: SettingItem }>();
 const cacheLimit = ref<number>(10);
 const cacheLimited = ref<number>(1);
 
-const changeCacheLimit = async (value: number) => {
-  await window.api.store.set("cacheLimit", value);
+// 保存缓存上限配置
+const changeCacheLimit = (value: number) => {
+  localStorage.setItem("cacheLimit", String(value));
 };
 
 const onUpdateLimit = (value: number | null) => {
@@ -61,12 +62,15 @@ const onUpdateLimited = (value: number) => {
   }
 };
 
-onMounted(async () => {
+onMounted(() => {
   try {
-    const limit = await window.api.store.get("cacheLimit");
-    if (typeof limit === "number") {
-      cacheLimit.value = limit;
-      if (limit === 0) cacheLimited.value = 0;
+    const saved = localStorage.getItem("cacheLimit");
+    if (saved !== null) {
+      const limit = Number(saved);
+      if (Number.isFinite(limit)) {
+        cacheLimit.value = limit;
+        if (limit === 0) cacheLimited.value = 0;
+      }
     }
   } catch (error) {
     console.error("读取缓存配置失败:", error);

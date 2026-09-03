@@ -259,7 +259,6 @@ const appRoutes: Array<RouteRecordRaw> = [
   {
     path: "/download",
     name: "download",
-    meta: { needApp: true },
     component: () => import("@/views/Download/layout.vue"),
     redirect: "/download/downloaded",
     children: [
@@ -272,41 +271,6 @@ const appRoutes: Array<RouteRecordRaw> = [
         path: "downloading",
         name: "download-downloading",
         component: () => import("@/views/Download/downloading.vue"),
-      },
-    ],
-  },
-  // 本地歌曲
-  {
-    path: "/local",
-    name: "local",
-    meta: { needApp: true },
-    component: () => import("@/views/Local/layout.vue"),
-    redirect: "/local/songs",
-    children: [
-      {
-        path: "songs",
-        name: "local-songs",
-        component: () => import("@/views/Local/song.vue"),
-      },
-      {
-        path: "artists",
-        name: "local-artists",
-        component: () => import("@/views/Local/artists.vue"),
-      },
-      {
-        path: "albums",
-        name: "local-albums",
-        component: () => import("@/views/Local/albums.vue"),
-      },
-      {
-        path: "folders",
-        name: "local-folders",
-        component: () => import("@/views/Local/folders.vue"),
-      },
-      {
-        path: "playlists",
-        name: "local-playlists",
-        component: () => import("@/views/Local/playlists.vue"),
       },
     ],
   },
@@ -373,13 +337,6 @@ const routes: Array<RouteRecordRaw> = [
     path: "/",
     component: AppLayout,
     children: [...appRoutes],
-  },
-  // 桌面歌词
-  {
-    path: "/desktop-lyric",
-    name: "desktop-lyric",
-    meta: { needApp: true },
-    component: () => import("@/views/DesktopLyric/index.vue"),
   },
   // 404
   {

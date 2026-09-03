@@ -581,6 +581,7 @@ onBeforeRouteUpdate((to) => {
       flex: 1;
       height: 100%;
       padding-right: 60px;
+      min-width: 0;
       .name {
         font-size: 30px;
         font-weight: bold;
@@ -597,6 +598,7 @@ onBeforeRouteUpdate((to) => {
           display: flex;
           align-items: center;
           flex-wrap: nowrap;
+          min-width: 0;
           .n-icon {
             font-size: 20px;
             margin-right: 4px;
@@ -644,6 +646,9 @@ onBeforeRouteUpdate((to) => {
       .data {
         padding-right: 0;
         align-items: center;
+        .name {
+          font-size: 22px;
+        }
         .actions {
           margin-top: 12px;
         }

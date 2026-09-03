@@ -56,5 +56,12 @@ const discoverType = ref<string>(
       line-height: normal;
     }
   }
+  @media (max-width: 768px) {
+    .title {
+      .keyword {
+        font-size: 24px;
+      }
+    }
+  }
 }
 </style>

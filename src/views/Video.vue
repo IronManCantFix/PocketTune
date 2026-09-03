@@ -372,6 +372,8 @@ onUnmounted(() => {
     }
     .meta {
       width: 100%;
+      flex-wrap: wrap;
+      gap: 12px;
       .item {
         display: flex;
         align-items: center;
@@ -379,6 +381,15 @@ onUnmounted(() => {
           font-size: 18px;
           margin-right: 6px;
         }
+      }
+    }
+  }
+  @media (max-width: 768px) {
+    .info {
+      height: auto;
+      .name {
+        font-size: 22px;
+        line-height: 26px;
       }
     }
   }
@@ -432,11 +443,23 @@ onUnmounted(() => {
         flex-direction: column;
         font-size: 16px;
         font-weight: bold;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
         &::after {
           content: "查看详情";
           font-size: 12px;
           font-weight: normal;
           opacity: 0.6;
+        }
+      }
+    }
+    @media (max-width: 768px) {
+      .artist {
+        .name {
+          &::after {
+            display: none;
+          }
         }
       }
     }

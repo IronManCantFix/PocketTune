@@ -2,10 +2,10 @@
 
 ## 项目技术栈与环境
 
-- **核心框架**: Vue 3 + Electron
+- **核心框架**: Vue 3 (Web，Docker 部署 / 本地开发，桌面端 Electron 已移除)
 - **UI 组件库**: **Naive UI** (严禁混用其他 UI 库)
 - **包管理器**: **严格使用 `pnpm`** (严禁使用 npm/yarn)
-- **开发命令**: `pnpm dev` (预览代码)
+- **开发命令**: `pnpm dev` (前端开发，需 `pnpm api` 提供后端接口)
 - **代码质量**: 每次任务结束前，必须自动运行 `pnpm lint` 并修复所有问题，确保 0 错误、0 警告后方可交付。
 - **提交之前**: 必须运行 `pnpm build` 和 `pnpm format` 并修复所有问题，确保 0 错误、0 警告后方可提交。
 
@@ -32,12 +32,7 @@
   - 正确: `<SvgIcon :name="isLikeAlbum ? 'Favorite' : 'FavoriteBorder'" />`
   - 错误: 擅自引入 `xicons` (除非用户明确允许) 或手写 SVG 代码。
 
-### 4. Electron 特性规范
-
-- **进程安全**: 明确代码运行环境（Main vs Renderer）。不要在渲染进程中直接调用不安全的 Node.js API，应优先使用 IPC 通信或 Preload 脚本暴露的 API。
-- **通信规范**: 涉及 IPC 通信时，保持频道命名清晰且常量化。
-
-### 5. 测试与清理
+### 4. 测试与清理
 
 - **临时文件**: 任务过程中生成的临时测试文件（如 `test_lrc.ts`），必须在任务结束前自动删除，严禁推送到代码库。
 

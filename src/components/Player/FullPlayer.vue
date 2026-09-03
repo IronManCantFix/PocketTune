@@ -95,7 +95,6 @@
 <script setup lang="ts">
 import { useMobile } from "@/composables/useMobile";
 import { useStatusStore, useMusicStore, useSettingStore } from "@/stores";
-import { isElectron } from "@/utils/env";
 
 const musicStore = useMusicStore();
 const statusStore = useStatusStore();
@@ -266,14 +265,10 @@ watch(
 
 onMounted(() => {
   mainCoverColor.value = statusStore.mainColor;
-  if (isElectron && settingStore.preventSleep) {
-    window.electron.ipcRenderer.send("prevent-sleep", true);
-  }
 });
 
 onBeforeUnmount(() => {
   stopShow();
-  if (isElectron) window.electron.ipcRenderer.send("prevent-sleep", false);
 });
 </script>
 

@@ -1,4 +1,3 @@
-import { isElectron } from "@/utils/env";
 import { defaultAMLLDbServer, songLevelData } from "@/utils/meta";
 import { SongUnlockServer } from "@/core/player/SongManager";
 import { useSettingStore } from "@/stores";
@@ -78,6 +77,25 @@ export const unlockSongUrl = (
   });
 };
 
+// 获取当前解灰音源配置
+export const getUnblockSources = () => {
+  return request({
+    baseURL: "/api/unblock",
+    url: "/sources",
+    method: "get",
+  });
+};
+
+// 设置解灰音源（空数组恢复默认顺序）
+export const setUnblockSources = (sources: string[]) => {
+  return request({
+    baseURL: "/api/unblock",
+    url: "/sources",
+    method: "put",
+    data: { sources },
+  });
+};
+
 // 获取歌曲歌词
 export const songLyric = (id: number) => {
   return request({
@@ -94,22 +112,18 @@ export const songLyric = (id: number) => {
  * @returns TTML 格式歌词
  */
 export const songLyricTTML = async (id: number) => {
-  if (isElectron) {
-    return request({ url: "/lyric/ttml", params: { id, noCookie: true } });
-  } else {
-    const settingStore = useSettingStore();
-    const server = settingStore.amllDbServer || defaultAMLLDbServer;
-    const url = server.replace("%s", String(id));
-    try {
-      const response = await fetch(url);
-      if (response === null || response.status !== 200) {
-        return null;
-      }
-      const data = await response.text();
-      return data;
-    } catch {
+  const settingStore = useSettingStore();
+  const server = settingStore.amllDbServer || defaultAMLLDbServer;
+  const url = server.replace("%s", String(id));
+  try {
+    const response = await fetch(url);
+    if (response === null || response.status !== 200) {
       return null;
     }
+    const data = await response.text();
+    return data;
+  } catch {
+    return null;
   }
 };
 

@@ -16,7 +16,6 @@
       placeholder="请输入 Cookie"
     />
     <n-flex class="menu">
-      <n-button v-if="isElectron" type="primary" @click="openWeb">自动获取</n-button>
       <n-button type="primary" @click="login">登录</n-button>
     </n-flex>
   </div>
@@ -24,7 +23,6 @@
 
 <script setup lang="ts">
 import type { LoginType } from "@/types/main";
-import { isElectron } from "@/utils/env";
 
 const emit = defineEmits<{
   close: [];
@@ -32,18 +30,6 @@ const emit = defineEmits<{
 }>();
 
 const cookie = ref<string>();
-
-// 开启窗口
-const openWeb = () => {
-  window.$dialog.info({
-    title: "使用前告知",
-    content:
-      "请知悉，该功能仍旧无法确保账号的安全性！请自行决定是否使用！如遇打开窗口后页面出现白屏或者无法点击等情况，请关闭后重试",
-    positiveText: "我已了解",
-    negativeText: "取消",
-    onPositiveClick: () => window.electron.ipcRenderer.send("open-login-web"),
-  });
-};
 
 // Cookie 登录
 const login = async () => {
@@ -90,16 +76,6 @@ const login = async () => {
     console.error("Cookie 登录出错：", error);
   }
 };
-
-onMounted(() => {
-  if (isElectron) {
-    window.electron.ipcRenderer.on("send-cookies", (_, value) => {
-      if (!value) return;
-      cookie.value = value;
-      login();
-    });
-  }
-});
 </script>
 
 <style lang="scss" scoped>

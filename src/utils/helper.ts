@@ -8,7 +8,6 @@ import { isEmpty } from "lodash-es";
 import { convertToLocalTime } from "./time";
 import { useSettingStore } from "@/stores";
 import { marked } from "marked";
-import { isElectron } from "./env";
 import SvgIcon from "@/components/Global/SvgIcon.vue";
 import Fuse from "fuse.js";
 
@@ -264,125 +263,6 @@ export const getUpdateLog = async (): Promise<UpdateLogType[]> => {
   return updateLogs;
 };
 
-/** 更改本地目录选项 */
-type ChangeLocalPathOptions = {
-  /** 设置项 key */
-  settingsKey: string;
-  /** 标题 */
-  title: string;
-  /** 是否包含子文件夹 */
-  includeSubFolders: boolean;
-  /** 控制台输出的错误信息 */
-  errorConsole: string;
-  /** 错误信息 */
-  errorMessage: string;
-};
-
-/**
- * 获取 更改本地目录
- * @param settingsKey 设置项 key
- * @param includeSubFolders 是否包含子文件夹
- * @param errorConsole 控制台输出的错误信息
- * @param errorMessage 错误信息
- */
-const changeLocalPath =
-  (
-    options: ChangeLocalPathOptions = {
-      settingsKey: "localFilesPath",
-      includeSubFolders: true,
-      title: "选择文件夹",
-      errorConsole: "Error changing local path",
-      errorMessage: "更改本地歌曲文件夹出错，请重试",
-    },
-  ) =>
-  async (delIndex?: number) => {
-    const { settingsKey, includeSubFolders, title, errorConsole, errorMessage } = options;
-    try {
-      if (!isElectron) return;
-      const settingStore = useSettingStore();
-      // 删除目录
-      if (typeof delIndex === "number" && delIndex >= 0) {
-        settingStore[settingsKey].splice(delIndex, 1);
-        return;
-      }
-      // 添加目录（支持多选）
-      const selectedDirs = await window.electron.ipcRenderer.invoke("choose-path", title, true);
-      if (!selectedDirs || selectedDirs.length === 0) return;
-      // 转换为数组（兼容单选返回字符串的情况）
-      const dirsToAdd = Array.isArray(selectedDirs) ? selectedDirs : [selectedDirs];
-      // 记录成功添加的数量
-      let addedCount = 0;
-      let skippedCount = 0;
-      // 用于追踪本次批量添加中已添加的路径
-      const newlyAddedPaths: string[] = [];
-      for (const selectedDir of dirsToAdd) {
-        // 检查时需要包含原有路径和本次已添加的路径
-        const pathsToCheck = [...settingStore[settingsKey], ...newlyAddedPaths];
-        // 是否是完全相同的路径
-        const isExactMatch = await window.electron.ipcRenderer.invoke(
-          "check-if-same-path",
-          pathsToCheck,
-          selectedDir,
-        );
-        if (isExactMatch) {
-          skippedCount++;
-          continue;
-        }
-        // 检查是否为子文件夹关系
-        if (includeSubFolders) {
-          const isSubfolder = await window.electron.ipcRenderer.invoke(
-            "check-if-subfolder",
-            pathsToCheck,
-            selectedDir,
-          );
-          if (isSubfolder) {
-            skippedCount++;
-            continue;
-          }
-        }
-        // 通过所有检查，添加目录
-        settingStore[settingsKey].push(selectedDir);
-        newlyAddedPaths.push(selectedDir);
-        addedCount++;
-      }
-      // 显示结果提示
-      if (addedCount > 0 && skippedCount > 0) {
-        window.$message.success(`成功添加 ${addedCount} 个目录，跳过 ${skippedCount} 个重复目录`);
-      } else if (addedCount > 0) {
-        window.$message.success(`成功添加 ${addedCount} 个目录`);
-      } else if (skippedCount > 0) {
-        window.$message.warning(`所选目录已存在或有重叠，已跳过`);
-      }
-    } catch (error) {
-      console.error(`${errorConsole}: `, error);
-      window.$message.error(errorMessage);
-    }
-  };
-
-/**
- * 更改本地音乐目录
- * @param delIndex 删除文件夹路径的索引
- */
-export const changeLocalMusicPath = changeLocalPath({
-  settingsKey: "localFilesPath",
-  includeSubFolders: true,
-  title: "选择本地歌曲文件夹",
-  errorConsole: "Error changing local path",
-  errorMessage: "更改本地歌曲文件夹出错，请重试",
-});
-
-/**
- * 更改本地歌词目录
- * @param delIndex 删除文件夹路径的索引
- */
-export const changeLocalLyricPath = changeLocalPath({
-  settingsKey: "localLyricPath",
-  includeSubFolders: true,
-  title: "选择本地歌词文件夹",
-  errorConsole: "Error changing local lyric path",
-  errorMessage: "更改本地歌词文件夹出错，请重试",
-});
-
 /**
  * 洗牌数组（Fisher-Yates）
  */
@@ -491,4 +371,69 @@ export const getShareUrl = (type: string, id: number | string): string => {
   }
 
   return `https://music.163.com/#/${type}?id=${id}`;
+};
+
+// 网易系域名（自带 CORS 头，可直连）
+const NETEASE_HOST_RE = /(?:^|\.)music\.126\.net$|(?:^|\.)music\.163\.com$/;
+
+// 第三方解锁音源域名白名单（与服务端代理白名单保持一致）
+const UNLOCK_HOST_SUFFIXES = [
+  "kuwo.cn",
+  "kugou.com",
+  "migu.cn",
+  "miguvideo.com",
+  "bilivideo.com",
+  "bilibili.com",
+  "gdstudio.xyz",
+  "126.net",
+  "163.com",
+];
+
+// 判断是否为白名单内的第三方音源
+const isUnlockHost = (url: string): boolean => {
+  try {
+    const host = new URL(url).hostname;
+    return UNLOCK_HOST_SUFFIXES.some((suffix) => host === suffix || host.endsWith(`.${suffix}`));
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * 将第三方解锁音频地址改写为同源代理地址
+ * 浏览器下跨源音频被 CORS 拦截（音频图需 crossorigin=anonymous），需经服务端转发
+ * @param url 原始音频地址
+ * @param force 是否强制代理（网易域名默认直连，下载场景可强制）
+ * @returns 代理后的相对地址或原地址
+ */
+export const toProxiedUrl = (url: string | undefined | null, force = false): string => {
+  if (!url) return "";
+  if (!/^https?:\/\//.test(url)) return url;
+  // 网易域名默认直连（自带 ACAO 头），第三方白名单域名走代理
+  const needProxy = force || (isUnlockHost(url) && !NETEASE_HOST_RE.test(new URL(url).hostname));
+  return needProxy ? `/api/unblock/proxy?url=${encodeURIComponent(url)}` : url;
+};
+
+// 音源显示名映射
+export const AUDIO_SOURCE_LABELS: Record<string, string> = {
+  official: "Official",
+  netease: "Netease",
+  kuwo: "Kuwo",
+  bodian: "Bodian",
+  local: "Local",
+  streaming: "Streaming",
+  kugou: "Kugou",
+  migu: "Migu",
+  bilibili: "Bilibili",
+  pyncmd: "Pyncmd",
+};
+
+/**
+ * 获取音源显示名
+ * @param source 音源标识
+ * @returns 显示名，未知音源转大写展示
+ */
+export const audioSourceLabel = (source?: string): string => {
+  if (!source) return "";
+  return AUDIO_SOURCE_LABELS[source] ?? source.toUpperCase();
 };

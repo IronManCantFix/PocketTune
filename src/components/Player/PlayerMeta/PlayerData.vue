@@ -147,7 +147,7 @@ import type { RouteLocationRaw } from "vue-router";
 import { useMusicStore, useStatusStore, useSettingStore } from "@/stores";
 import { debounce, isObject } from "lodash-es";
 import { removeBrackets } from "@/utils/format";
-import { SongUnlockServer } from "@/core/player/SongManager";
+import { audioSourceLabel } from "@/utils/helper";
 import { useLyricManager } from "@/core/player/LyricManager";
 import { usePlayerController } from "@/core/player/PlayerController";
 import { radioProgramDetail } from "@/api/radio";
@@ -204,7 +204,7 @@ const audioSourceOptions = computed(() => {
   settingStore.songUnlockServer.forEach((server) => {
     if (server.enabled) {
       options.push({
-        label: sourceMap[server.key] || server.key.toUpperCase(),
+        label: audioSourceLabel(server.key) || server.key.toUpperCase(),
         value: server.key,
       });
     }
@@ -219,22 +219,13 @@ const canSwitchSource = computed(() => {
 });
 
 /** 音频源名称映射 */
-const sourceMap: Record<string, string> = {
-  official: "Official",
-  [SongUnlockServer.NETEASE]: "Netease",
-  [SongUnlockServer.KUWO]: "Kuwo",
-  [SongUnlockServer.BODIAN]: "Bodian",
-  local: "Local",
-  streaming: "Streaming",
-};
-
 /** 音频源名称 */
 const audioSourceText = computed(() => {
   if (musicStore.playSong.path) return "本地";
   if (musicStore.playSong.type === "streaming") return "流媒体";
   if (musicStore.playSong.pc) return "云盘";
   if (statusStore.audioSource) {
-    return sourceMap[statusStore.audioSource] || statusStore.audioSource.toUpperCase();
+    return audioSourceLabel(statusStore.audioSource) || statusStore.audioSource.toUpperCase();
   }
   return "Netease";
 });

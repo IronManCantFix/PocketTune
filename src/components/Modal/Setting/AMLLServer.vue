@@ -66,11 +66,10 @@ const noSideSpace = (value: string) => value.trim() === value;
 const isValidServer = (url: string) => isValidURL(url) && url.includes("%s");
 
 // 点击确认
-const handleConfirm = async () => {
+const handleConfirm = () => {
   const url = serverUrl.value;
   // 验证 URL 格式和 %s
   if (isValidServer(url)) {
-    await window.api.store.set("amllDbServer", url);
     settingStore.amllDbServer = url;
     window.$message.success("AMLL TTML DB 地址已更新");
     props.onClose();

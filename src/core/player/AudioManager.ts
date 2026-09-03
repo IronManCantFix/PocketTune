@@ -1,5 +1,5 @@
 import { useSettingStore } from "@/stores";
-import { checkIsolationSupport, isElectron } from "@/utils/env";
+import { checkIsolationSupport } from "@/utils/env";
 import { TypedEventTarget } from "@/utils/TypedEventTarget";
 import { AudioElementPlayer } from "../audio-player/AudioElementPlayer";
 import { AUDIO_EVENTS, type AudioEventMap } from "../audio-player/BaseAudioPlayer";
@@ -11,7 +11,6 @@ import type {
   PauseOptions,
   PlayOptions,
 } from "../audio-player/IPlaybackEngine";
-import { MpvPlayer, useMpvPlayer } from "../audio-player/MpvPlayer";
 import { getSharedAudioContext } from "../automix/SharedAudioContext";
 
 /**
@@ -33,22 +32,17 @@ class AudioManager extends TypedEventTarget<AudioEventMap> implements IPlaybackE
   /** 主音量 (用于 Crossfade 初始化) */
   private _masterVolume: number = 1.0;
 
-  /** 当前引擎类型：element | ffmpeg | mpv */
-  public readonly engineType: "element" | "ffmpeg" | "mpv";
+  /** 当前引擎类型：element | ffmpeg */
+  public readonly engineType: "element" | "ffmpeg";
 
   /** 引擎能力描述 */
   public readonly capabilities: EngineCapabilities;
 
-  constructor(playbackEngine: "web-audio" | "mpv", audioEngine: "element" | "ffmpeg") {
+  constructor(audioEngine: "element" | "ffmpeg") {
     super();
 
     // 根据设置选择引擎
-    if (isElectron && playbackEngine === "mpv") {
-      const mpvPlayer = useMpvPlayer();
-      mpvPlayer.init();
-      this.engine = mpvPlayer;
-      this.engineType = "mpv";
-    } else if (audioEngine === "ffmpeg" && checkIsolationSupport()) {
+    if (audioEngine === "ffmpeg" && checkIsolationSupport()) {
       this.engine = new FFmpegAudioPlayer();
       this.engineType = "ffmpeg";
     } else {
@@ -146,18 +140,6 @@ class AudioManager extends TypedEventTarget<AudioEventMap> implements IPlaybackE
       fadeCurve?: FadeCurve;
     },
   ): Promise<void> {
-    // MPV 不支持 Web Audio API 级别的 Crossfade，回退到普通播放
-    if (this.engineType === "mpv") {
-      this.stop();
-      if (options.onSwitch) options.onSwitch();
-      await this.play(url, {
-        autoPlay: options.autoPlay ?? true,
-        seek: options.seek,
-        fadeIn: true,
-        fadeDuration: options.duration,
-      });
-      return;
-    }
     console.log(
       `🔀 [AudioManager] Starting Crossfade (duration: ${options.duration}s, type: ${options.mixType})`,
     );
@@ -371,7 +353,7 @@ class AudioManager extends TypedEventTarget<AudioEventMap> implements IPlaybackE
    * @param offset 偏移量 (毫秒)
    */
   public setAudioDelayCompensation(offset: number): void {
-    // FFmpeg 和 MPV 引擎可能没有实现此方法
+    // 部分引擎可能没有实现此方法
     this.engine.setAudioDelayCompensation?.(offset);
   }
 
@@ -468,26 +450,6 @@ class AudioManager extends TypedEventTarget<AudioEventMap> implements IPlaybackE
   }
 
   /**
-   * 解除 MPV 强制暂停状态
-   * 仅在 MPV 引擎下有效
-   */
-  public clearForcePaused(): void {
-    if (this.engine instanceof MpvPlayer) {
-      this.engine.clearForcePaused();
-    }
-  }
-
-  /**
-   * 设置 MPV 期望的 Seek 位置
-   * 仅在 MPV 引擎下有效
-   */
-  public setPendingSeek(seconds: number | null): void {
-    if (this.engine instanceof MpvPlayer) {
-      this.engine.setPendingSeek(seconds);
-    }
-  }
-
-  /**
    * 切换播放/暂停
    */
   public togglePlayPause(): void {
@@ -509,10 +471,7 @@ export const useAudioManager = (): AudioManager => {
   const win = window as Window & { [AUDIO_MANAGER_KEY]?: AudioManager };
   if (!win[AUDIO_MANAGER_KEY]) {
     const settingStore = useSettingStore();
-    win[AUDIO_MANAGER_KEY] = new AudioManager(
-      settingStore.playbackEngine,
-      settingStore.audioEngine,
-    );
+    win[AUDIO_MANAGER_KEY] = new AudioManager(settingStore.audioEngine);
 
     // 监听音频延迟补偿变化
     watch(

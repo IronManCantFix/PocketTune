@@ -1,9 +1,6 @@
 import { defineStore } from "pinia";
 import type { SongType } from "@/types/main";
-import { isElectron } from "@/utils/env";
-import { cloneDeep } from "lodash-es";
 import { SongLyric } from "@/types/lyric";
-import { sendTaskbarLyrics } from "@/core/player/PlayerIpc";
 
 interface MusicState {
   playSong: SongType;
@@ -84,9 +81,6 @@ export const useMusicStore = defineStore("music", {
       this.playSong = { ...defaultMusicData };
       this.playPlaylistId = 0;
       this.setSongLyric({ lrcData: [], yrcData: [] }, true);
-      if (isElectron) {
-        window.electron.ipcRenderer.send("play-song-change", null);
-      }
     },
     /**
      * 设置/更新歌曲歌词数据
@@ -104,21 +98,6 @@ export const useMusicStore = defineStore("music", {
           lrcData: updates.lrcData ?? this.songLyric.lrcData,
           yrcData: updates.yrcData ?? this.songLyric.yrcData,
         };
-      }
-      // 更新歌词窗口数据
-      if (isElectron) {
-        // 桌面歌词
-        window.electron.ipcRenderer.send(
-          "play-lyric-change",
-          cloneDeep({
-            songId: this.playSong?.id,
-            lyricLoading: false,
-            lrcData: this.songLyric.lrcData ?? [],
-            yrcData: this.songLyric.yrcData ?? [],
-          }),
-        );
-        // 状态栏歌词
-        sendTaskbarLyrics(this.songLyric);
       }
     },
     // 获取歌曲封面

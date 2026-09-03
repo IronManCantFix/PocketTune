@@ -22,15 +22,6 @@
               </div>
               <n-switch v-model:value="enableExcludeTTML" class="set" :round="false" />
             </n-card>
-            <n-card v-if="isElectron" class="set-item">
-              <div class="label">
-                <n-text class="name">本地歌词排除</n-text>
-                <n-text class="tip" :depth="3">
-                  是否要对来自本地的歌词进行歌词排除，这包含本地覆盖的在线歌词和本地歌曲中的歌词
-                </n-text>
-              </div>
-              <n-switch v-model:value="enableExcludeLocalLyrics" class="set" :round="false" />
-            </n-card>
           </div>
         </n-tab-pane>
 
@@ -108,7 +99,6 @@
 
 <script setup lang="ts">
 import { useSettingStore } from "@/stores";
-import { isElectron } from "@/utils/env";
 
 const emit = defineEmits(["close"]);
 

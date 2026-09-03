@@ -10,11 +10,10 @@ import {
 } from "@/stores";
 import { QualityType, type SongType, type AudioSourceType } from "@/types/main";
 import { isLogin } from "@/utils/auth";
-import { isElectron } from "@/utils/env";
 import { formatSongsList } from "@/utils/format";
 import { toFileUrl } from "@/utils/fileUrl";
 import { AI_AUDIO_LEVELS } from "@/utils/meta";
-import { handleSongQuality } from "@/utils/helper";
+import { handleSongQuality, toProxiedUrl } from "@/utils/helper";
 import { openUserLogin } from "@/utils/modal";
 
 /**
@@ -56,49 +55,6 @@ class SongManager {
     return this.nextPrefetch;
   }
 
-  public async getMusicCachePath(
-    id: number | string,
-    quality?: QualityType | string,
-  ): Promise<string | null> {
-    const settingStore = useSettingStore();
-    if (!isElectron || !settingStore.cacheEnabled || !settingStore.songCacheEnabled) return null;
-    try {
-      return await window.electron.ipcRenderer.invoke("music-cache-check", id, quality);
-    } catch {
-      return null;
-    }
-  }
-
-  public async ensureMusicCachePath(
-    id: number | string,
-    url: string | undefined,
-    quality?: QualityType | string,
-  ): Promise<string | null> {
-    const existing = await this.getMusicCachePath(id, quality);
-    if (existing) return existing;
-    if (!url) return null;
-
-    const settingStore = useSettingStore();
-    if (!isElectron || !settingStore.cacheEnabled || !settingStore.songCacheEnabled) return null;
-    try {
-      const result: unknown = await window.electron.ipcRenderer.invoke(
-        "music-cache-download",
-        id,
-        url,
-        quality || "standard",
-      );
-      if (result && typeof result === "object") {
-        const record = result as Record<string, unknown>;
-        if (record.success === true && typeof record.path === "string") {
-          return record.path;
-        }
-      }
-    } catch {
-      return null;
-    }
-    return await this.getMusicCachePath(id);
-  }
-
   /**
    * 预加载封面图片
    * @param song 歌曲信息
@@ -131,50 +87,6 @@ class SongManager {
       img.src = url;
     });
   }
-
-  /**
-   * 检查本地缓存
-   * @param id 歌曲id
-   * @param quality 音质
-   * @param md5 歌曲文件md5
-   */
-  private checkLocalCache = async (
-    id: number,
-    quality?: QualityType,
-    md5?: string,
-  ): Promise<string | null> => {
-    const settingStore = useSettingStore();
-    if (isElectron && settingStore.cacheEnabled && settingStore.songCacheEnabled) {
-      try {
-        const cachePath = await window.electron.ipcRenderer.invoke(
-          "music-cache-check",
-          id,
-          quality,
-          md5,
-        );
-        if (cachePath) {
-          console.log(`🚀 [${id}] 由本地音乐缓存提供`);
-          return toFileUrl(cachePath);
-        }
-      } catch (e) {
-        console.error(`❌ [${id}] 检查缓存失败:`, e);
-      }
-    }
-    return null;
-  };
-
-  /**
-   * 触发缓存下载
-   * @param id 歌曲id
-   * @param url 下载地址
-   * @param quality 音质
-   */
-  private triggerCacheDownload = (id: number, url: string, quality?: QualityType | string) => {
-    const settingStore = useSettingStore();
-    if (isElectron && settingStore.cacheEnabled && settingStore.songCacheEnabled && url) {
-      window.electron.ipcRenderer.invoke("music-cache-download", id, url, quality || "standard");
-    }
-  };
 
   /**
    * 获取在线播放链接
@@ -223,15 +135,18 @@ class SongManager {
     if (!songData || !songData?.url) return { id, url: undefined };
     // 是否仅能试听
     const isTrial = songData?.freeTrialInfo != null;
-    // 返回歌曲地址
-    const normalizedUrl = isElectron
-      ? songData.url
-      : songData.url
-          .replace(/^http:/, "https:")
-          .replace(/m804\.music\.126\.net/g, "m801.music.126.net")
-          .replace(/m704\.music\.126\.net/g, "m701.music.126.net");
+    // 网易域名：统一使用 https 与替代 CDN；第三方解锁音源：走同源代理规避 CORS
+    let normalizedUrl: string;
+    if (/music\.126\.net|music\.163\.com/.test(songData.url)) {
+      normalizedUrl = songData.url
+        .replace(/^http:/, "https:")
+        .replace(/m804\.music\.126\.net/g, "m801.music.126.net")
+        .replace(/m704\.music\.126\.net/g, "m701.music.126.net");
+    } else {
+      normalizedUrl = toProxiedUrl(songData.url);
+    }
     // 若为试听且未开启试听播放，则将 url 置为空，仅标记为试听
-    const finalUrl = isTrial && !settingStore.playSongDemo ? null : normalizedUrl;
+    const finalUrl = isTrial && !settingStore.playSongDemo ? undefined : normalizedUrl;
 
     // 获取音质：如果请求的是杜比，直接使用杜比音质，否则从返回数据判断
     let quality: QualityType | undefined;
@@ -243,18 +158,9 @@ class SongManager {
       quality = handleSongQuality(songData, "online");
     }
 
-    // 检查本地缓存
-    if (finalUrl && quality) {
-      const cachedUrl = await this.checkLocalCache(id, quality, songData?.md5);
-      if (cachedUrl) {
-        return { id, url: cachedUrl, isTrial, quality };
-      }
-    }
-    // 缓存对应音质音乐
-    if (finalUrl) {
-      this.triggerCacheDownload(id, finalUrl, quality);
-    }
-    return { id, url: finalUrl, isTrial, quality };
+    // 服务端 UNM 解灰时携带实际音源标记
+    const unmSource = (songData as { unmSource?: AudioSourceType }).unmSource;
+    return { id, url: finalUrl, isTrial, quality, source: unmSource };
   };
 
   /**
@@ -269,23 +175,6 @@ class SongManager {
   ): Promise<AudioSource> => {
     const settingStore = useSettingStore();
     const songId = song.id;
-    // 优先检查本地缓存 (仅在未指定源或指定为 auto 时)
-    if (!specificSource || specificSource === "auto") {
-      const cachedUrl = await this.checkLocalCache(songId);
-      if (cachedUrl) {
-        // Auto 模式下命中缓存，尝试获取第一个启用的源作为标识
-        let source: AudioSourceType = SongUnlockServer.NETEASE;
-        const firstEnabled = settingStore.songUnlockServer.find((s) => s.enabled);
-        if (firstEnabled) source = firstEnabled.key as AudioSourceType;
-        return {
-          id: songId,
-          url: cachedUrl,
-          isUnlocked: true,
-          source,
-          quality: QualityType.HQ,
-        };
-      }
-    }
     const artistName = Array.isArray(song.artists)
       ? song.artists.map((a) => a.name).join(" & ")
       : song.artists;
@@ -325,8 +214,6 @@ class SongManager {
     for (const r of results) {
       if (r.status === "fulfilled" && r.value.success) {
         const unlockUrl = r.value?.result?.url;
-        // 解锁成功后，触发下载
-        this.triggerCacheDownload(songId, unlockUrl);
         // 推断音质
         let quality = QualityType.HQ;
         if (unlockUrl && (unlockUrl.includes(".flac") || unlockUrl.includes(".wav"))) {
@@ -335,7 +222,8 @@ class SongManager {
         console.log(`最终音质判断：详细输出：`, { unlockUrl, quality });
         return {
           id: songId,
-          url: unlockUrl,
+          // 第三方音源经同源代理转发，规避浏览器 CORS 拦截
+          url: toProxiedUrl(unlockUrl),
           isUnlocked: true,
           quality,
           source: r.value.server,
@@ -406,12 +294,6 @@ class SongManager {
       lyricManager.prefetchLyric(nextSong);
       // 本地歌曲
       if (nextSong.path) {
-        // 预分析音频 (Automix)
-        if (isElectron && settingStore.enableAutomix) {
-          window.electron.ipcRenderer.invoke("analyze-audio-head", nextSong.path).catch((e) => {
-            console.warn("[Prefetch] Analysis failed:", e);
-          });
-        }
         return;
       }
       // 流媒体歌曲
@@ -429,7 +311,7 @@ class SongManager {
       const songId = nextSong.type === "radio" ? nextSong.dj?.id : nextSong.id;
       if (!songId) return;
       // 是否可解锁
-      const canUnlock = isElectron && nextSong.type !== "radio" && settingStore.useSongUnlock;
+      const canUnlock = nextSong.type !== "radio" && settingStore.useSongUnlock;
       // 先请求官方地址
       const { url: officialUrl, isTrial, quality } = await this.getOnlineUrl(songId, false);
       if (officialUrl && !isTrial) {
@@ -485,13 +367,6 @@ class SongManager {
 
     // 本地文件直接返回
     if (song.path && song.type !== "streaming") {
-      // 检查本地文件是否存在
-      const result = await window.electron.ipcRenderer.invoke("file-exists", song.path);
-      if (!result) {
-        this.nextPrefetch = undefined;
-        console.error("❌ 本地文件不存在");
-        return { id: song.id, url: undefined };
-      }
       const fileUrl = toFileUrl(song.path);
       return { id: song.id, url: fileUrl, source: "local" };
     }
@@ -530,7 +405,7 @@ class SongManager {
     // 在线获取
     try {
       // 是否可解锁
-      const canUnlock = isElectron && song.type !== "radio" && settingStore.useSongUnlock;
+      const canUnlock = song.type !== "radio" && settingStore.useSongUnlock;
 
       // 如果指定了非官方源，直接走解锁流程
       if (forceSource && forceSource !== "auto") {
@@ -564,38 +439,10 @@ class SongManager {
           return unlockUrl;
         }
       }
-      // 最后的兜底：检查本地是否有缓存（不区分音质）
-      if (!forceSource || forceSource === "auto") {
-        const fallbackUrl = await this.checkLocalCache(songId);
-        if (fallbackUrl) {
-          console.log(`🚀 [${songId}] 网络请求失败，使用本地缓存兜底`, fallbackUrl);
-          return {
-            id: songId,
-            url: fallbackUrl,
-            isUnlocked: true,
-            source: "local",
-            quality: QualityType.HQ,
-          };
-        }
-      }
       // 无可用源
       return { id: songId, url: undefined, quality: undefined, isUnlocked: false };
     } catch (e) {
       console.error(`❌ [${songId}] 获取音频源异常:`, e);
-      // 异常时的兜底：检查本地是否有缓存
-      if (!forceSource || forceSource === "auto") {
-        const fallbackUrl = await this.checkLocalCache(songId);
-        if (fallbackUrl) {
-          console.log(`🚀 [${songId}] 获取异常，使用本地缓存兜底`);
-          return {
-            id: songId,
-            url: fallbackUrl,
-            isUnlocked: true,
-            source: "local",
-            quality: QualityType.HQ,
-          };
-        }
-      }
       return {
         id: songId,
         url: undefined,

@@ -87,7 +87,6 @@ export const settingMigrations: Record<number, MigrationFunction> = {
       hideLike?: boolean;
       hideCloud?: boolean;
       hideDownload?: boolean;
-      hideLocal?: boolean;
       hideHistory?: boolean;
       hideUserPlaylists?: boolean;
       hideLikedPlaylists?: boolean;
@@ -105,7 +104,6 @@ export const settingMigrations: Record<number, MigrationFunction> = {
         hideLike: oldState.hideLike || false,
         hideCloud: oldState.hideCloud || false,
         hideDownload: oldState.hideDownload || false,
-        hideLocal: oldState.hideLocal || false,
         hideHistory: oldState.hideHistory || false,
         hideUserPlaylists: oldState.hideUserPlaylists || false,
         hideLikedPlaylists: oldState.hideLikedPlaylists || false,

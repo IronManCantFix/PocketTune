@@ -38,17 +38,6 @@
         <span>当前歌曲不支持切换音质</span>
       </n-popover>
     </template>
-    <!-- 桌面歌词 -->
-    <n-badge
-      v-if="isElectron && settingStore.fullscreenPlayerElements.desktopLyric"
-      value="ON"
-      :show="statusStore.showDesktopLyric"
-      class="hidden"
-    >
-      <div class="menu-icon hidden" @click.stop="player.toggleDesktopLyric()">
-        <SvgIcon name="DesktopLyric2" :depth="statusStore.showDesktopLyric ? 1 : 3" />
-      </div>
-    </n-badge>
     <!-- 其他控制 -->
     <n-dropdown
       v-if="settingStore.fullscreenPlayerElements.moreSettings"
@@ -100,7 +89,6 @@
 <script setup lang="ts">
 import { usePlayerController } from "@/core/player/PlayerController";
 import { useDataStore, useSettingStore, useStatusStore, useMusicStore } from "@/stores";
-import { isElectron } from "@/utils/env";
 import { renderIcon } from "@/utils/helper";
 import { openAutoClose, openChangeRate, openEqualizer, openABLoop } from "@/utils/modal";
 import { useAudioManager } from "@/core/player/AudioManager";

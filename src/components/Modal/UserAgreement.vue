@@ -117,7 +117,6 @@
       </n-card>
     </n-scrollbar>
     <n-flex justify="center">
-      <n-button v-if="isElectron" type="error" @click="closeApp">不同意</n-button>
       <n-button type="success" @click="agreeToAgreement" :disabled="!isReadOver">
         {{ isReadOver ? "同意并使用" : "请先完整阅读" }}
       </n-button>
@@ -126,7 +125,6 @@
 </template>
 
 <script setup lang="ts">
-import { isElectron } from "@/utils/env";
 import { useSettingStore } from "@/stores";
 import { CURRENT_AGREEMENT_VERSION } from "@/constants/agreement";
 
@@ -147,11 +145,6 @@ const agreeToAgreement = () => {
   settingStore.userAgreementVersion = CURRENT_AGREEMENT_VERSION;
   // 关闭弹窗
   emit("close");
-};
-
-// 关闭软件
-const closeApp = () => {
-  window.electron.ipcRenderer.send("quit-app");
 };
 </script>
 

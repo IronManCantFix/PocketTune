@@ -8,18 +8,6 @@ declare global {
     $notification: NotificationApi;
     $loadingBar: LoadingBarApi;
     $modal: ModalApi;
-    // electron
-    api: {
-      store: {
-        get: (key: string) => Promise<any>;
-        set: (key: string, value: unknown) => Promise<boolean>;
-        has: (key: string) => Promise<boolean>;
-        delete: (key: string) => Promise<boolean>;
-        reset: (keys?: string[]) => Promise<boolean>;
-        export: (data: any) => Promise<{ success: boolean; path?: string; error?: string }>;
-        import: () => Promise<{ success: boolean; data?: any; error?: string }>;
-      };
-    };
     // logs
     logger: {
       info: (message: string, ...args: unknown[]) => void;

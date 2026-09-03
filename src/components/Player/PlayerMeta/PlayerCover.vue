@@ -56,7 +56,6 @@ import { useMobile } from "@/composables/useMobile";
 import { useBlobURLManager } from "@/core/resource/BlobURLManager";
 import { useSettingStore, useStatusStore, useMusicStore } from "@/stores";
 import { isLogin } from "@/utils/auth";
-import { isElectron } from "@/utils/env";
 import { isEmpty } from "lodash-es";
 
 const musicStore = useMusicStore();
@@ -101,9 +100,9 @@ const { start: dynamicCoverStart, stop: dynamicCoverStop } = useTimeoutFn(
   { immediate: false },
 );
 
-// 获取本地歌曲高清封面
-const getLocalCover = async () => {
-  if (!isElectron || !musicStore.playSong.path || musicStore.playSong.type === "streaming") {
+// 获取本地歌曲封面
+const getLocalCover = () => {
+  if (!musicStore.playSong.path || musicStore.playSong.type === "streaming") {
     cleanupLocalCover();
     return;
   }
@@ -112,30 +111,8 @@ const getLocalCover = async () => {
   const blobURL = blobURLManager.getBlobURL(musicStore.playSong.path);
   if (blobURL) {
     localCoverDataUrl.value = blobURL;
-    return;
-  }
-  try {
-    const coverData = await window.electron.ipcRenderer.invoke(
-      "get-music-cover",
-      musicStore.playSong.path,
-    );
-    if (coverData) {
-      // 使用 Data URL，确保跨窗口可用
-      const blob = new Blob([coverData.data], { type: coverData.format });
-      const reader = new FileReader();
-      const dataUrl = await new Promise<string>((resolve, reject) => {
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = reject;
-        reader.onabort = reject;
-        reader.readAsDataURL(blob);
-      });
-      localCoverDataUrl.value = dataUrl;
-    } else {
-      localCoverDataUrl.value = "";
-    }
-  } catch (error) {
-    console.error("获取本地封面失败:", error);
-    localCoverDataUrl.value = "";
+  } else {
+    cleanupLocalCover();
   }
 };
 

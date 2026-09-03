@@ -11,7 +11,6 @@ import { rgbToHex } from "@imsyy/color-utils";
 import { useSettingStore, useStatusStore } from "@/stores";
 import { argbToRgb } from "./helper";
 import { chunk } from "lodash-es";
-import { sendTaskbarThemeColor } from "@/core/player/PlayerIpc";
 
 // 单调主题（纯色模式）
 export const MONOTONOUS_THEME = {
@@ -183,31 +182,7 @@ export const getCoverColor = async (coverUrl: string) => {
     if (!settingStore.playerFollowCoverColor) {
       statusStore.songCoverTheme.main = { r: 239, g: 239, b: 239 };
     }
-    // 获取任务栏封面颜色
-    sendTaskbarCoverColor();
     // 移除元素
     image.remove();
   };
-};
-
-/**
- * 发送任务栏封面颜色
- * 从 statusStore.songCoverTheme 读取封面主色
- */
-export const sendTaskbarCoverColor = () => {
-  const settingStore = useSettingStore();
-  if (!settingStore.taskbarLyricUseThemeColor) {
-    sendTaskbarThemeColor(null);
-    return;
-  }
-  const statusStore = useStatusStore();
-  const coverTheme = statusStore.songCoverTheme;
-  // 检查亮暗模式数据是否存在
-  if (!coverTheme?.dark?.primary || !coverTheme?.light?.primary) return;
-  const darkPrimary = coverTheme.dark.primary;
-  const lightPrimary = coverTheme.light.primary;
-  sendTaskbarThemeColor({
-    dark: rgbToHex(darkPrimary.r, darkPrimary.g, darkPrimary.b),
-    light: rgbToHex(lightPrimary.r, lightPrimary.g, lightPrimary.b),
-  });
 };

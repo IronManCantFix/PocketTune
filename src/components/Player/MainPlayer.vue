@@ -55,6 +55,10 @@
               style="cursor: pointer"
               @click.stop="settingStore.hiddenCovers.player && (statusStore.showFullPlayer = true)"
             />
+            <!-- 音源 -->
+            <n-tag v-if="sourceTag" size="small" round type="warning" class="source-tag">
+              {{ sourceTag }}
+            </n-tag>
             <!-- 倍速 -->
             <n-tag
               v-if="statusStore.playRate !== 1"
@@ -250,7 +254,7 @@ import { useDataStore, useMusicStore, useSettingStore, useStatusStore } from "@/
 import { toLikeSong } from "@/utils/auth";
 import { useTimeFormat } from "@/composables/useTimeFormat";
 import { useSwipe } from "@vueuse/core";
-import { copyData, coverLoaded, renderIcon, getShareUrl } from "@/utils/helper";
+import { copyData, coverLoaded, renderIcon, getShareUrl, audioSourceLabel } from "@/utils/helper";
 import {
   openAutoClose,
   openChangeRate,
@@ -275,6 +279,13 @@ const songManager = useSongManager();
 const { timeDisplay, toggleTimeFormat } = useTimeFormat();
 
 const playerRef = ref<HTMLElement | null>(null);
+
+// 底部条音源标签（本地/流媒体等已有独立标识，不重复显示）
+const sourceTag = computed(() => {
+  const source = statusStore.audioSource;
+  if (!source || source === "local" || source === "streaming") return "";
+  return audioSourceLabel(source);
+});
 
 // 触摸滑动切换歌曲
 const { direction } = useSwipe(playerRef, {
@@ -468,6 +479,7 @@ const showCreatorTip = () => window.$message.info("暂不支持查看主播主�
     height: 100%;
     max-width: 640px;
     padding-left: 68px;
+    min-width: 0;
     .cover {
       position: absolute;
       display: flex;
@@ -524,12 +536,14 @@ const showCreatorTip = () => window.$message.info("暂不支持查看主播主�
       .data {
         display: flex;
         align-items: center;
+        min-width: 0;
         .name {
           font-weight: bold;
           font-size: 16px;
-          flex: 0 1 auto;
+          flex: 1 1 auto;
           width: auto;
           min-width: 0;
+          max-width: 100%;
           transition: color 0.3s;
         }
         .n-tag {
@@ -560,6 +574,7 @@ const showCreatorTip = () => window.$message.info("暂不支持查看主播主�
         height: 22px;
         margin-top: 2px;
         overflow: hidden;
+        min-width: 0;
         .lyric,
         .artists {
           margin-top: 0;
@@ -570,6 +585,8 @@ const showCreatorTip = () => window.$message.info("暂不支持查看主播主�
           height: 100%;
           display: flex;
           align-items: center;
+          min-width: 0;
+          overflow: hidden;
         }
       }
       .artists {
@@ -577,6 +594,9 @@ const showCreatorTip = () => window.$message.info("暂不支持查看主播主�
         overflow: hidden;
 
         .artists-container {
+          min-width: 0;
+          max-width: 100%;
+          overflow: hidden;
           .ar-item {
             display: inline-flex;
             transition: color 0.3s;
@@ -692,10 +712,63 @@ const showCreatorTip = () => window.$message.info("暂不支持查看主播主�
   }
   @media (max-width: 810px) {
     grid-template-columns: 1fr auto auto;
+    padding: 0 8px;
     .play-control {
-      margin: 0 0 0 12px;
+      margin: 0 0 0 8px;
+      .play-pause {
+        margin: 0;
+        --n-width: 40px;
+        --n-height: 40px;
+      }
       .play-icon {
         display: none;
+      }
+    }
+    .play-data {
+      padding-left: 60px;
+      .cover {
+        width: 50px;
+        height: 50px;
+        min-width: 50px;
+        :deep(img) {
+          width: 50px;
+          height: 50px;
+        }
+      }
+      .info {
+        .data {
+          .name {
+            font-size: 15px;
+          }
+          .like,
+          .more {
+            margin-left: 6px;
+          }
+          :deep(.n-tag) {
+            margin-left: 6px;
+          }
+        }
+      }
+    }
+  }
+  @media (max-width: 512px) {
+    .play-data {
+      padding-left: 56px;
+      .cover {
+        width: 46px;
+        height: 46px;
+        min-width: 46px;
+        :deep(img) {
+          width: 46px;
+          height: 46px;
+        }
+      }
+      .info {
+        .data {
+          .name {
+            font-size: 14px;
+          }
+        }
       }
     }
   }

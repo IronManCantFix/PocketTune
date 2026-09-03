@@ -107,6 +107,6 @@ export const picture = (url: string, scale = 1) => {
 
 // 版本输出
 export const printVersion = async () => {
-  success(`🚀 ${packageJson.version}`, packageJson.productName);
+  success(`🚀 ${packageJson.version}`, packageJson.name);
   info(`👤 ${packageJson.author}`, packageJson.github);
 };

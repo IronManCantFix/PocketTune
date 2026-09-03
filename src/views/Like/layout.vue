@@ -104,6 +104,7 @@ watch(
     margin-top: 12px;
     margin-bottom: 20px;
     height: 40px;
+    flex-wrap: wrap;
     .keyword {
       font-size: 30px;
       font-weight: bold;
@@ -122,6 +123,14 @@ watch(
         .n-icon {
           margin-right: 4px;
         }
+      }
+    }
+  }
+  // 768px
+  @media (max-width: 768px) {
+    .title {
+      .keyword {
+        font-size: 24px;
       }
     }
   }

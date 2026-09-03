@@ -1,89 +1,15 @@
 import { useMusicStore, useSettingStore, useStatusStore } from "@/stores";
-import { isElectron } from "@/utils/env";
 import { getPlaySongData } from "@/utils/format";
 import { msToS } from "@/utils/time";
-import type { SystemMediaEvent } from "@emi";
 import { throttle } from "lodash-es";
 import { usePlayerController } from "./PlayerController";
-import {
-  enableDiscordRpc,
-  sendMediaMetadata,
-  sendMediaPlayMode,
-  sendMediaPlayState,
-  sendMediaPlaybackRate,
-  sendMediaVolume,
-  sendMediaTimeline,
-  updateDiscordConfig,
-} from "./PlayerIpc";
 
 /**
- * 媒体会话管理器，负责不同平台的媒体控制集成
- * 在 Electron 平台上会使用原生插件，Web 平台上会使用 Navigator.mediaSession
+ * 媒体会话管理器
+ * web 平台使用 Navigator.mediaSession 提供系统级媒体控制
  */
 class MediaSessionManager {
-  private metadataAbortController: AbortController | null = null;
   private currentRate: number = 1;
-
-  private throttledSendTimeline = throttle((currentTime: number, duration: number) => {
-    sendMediaTimeline(currentTime, duration);
-  }, 200);
-
-  /**
-   * 是否使用原生媒体集成
-   */
-  private shouldUseNativeMedia(): boolean {
-    return isElectron;
-  }
-
-  /**
-   * 处理原生来的媒体事件
-   */
-  private handleMediaEvent(
-    event: SystemMediaEvent,
-    player: ReturnType<typeof usePlayerController>,
-  ) {
-    switch (event.type) {
-      case "Play":
-        player.play();
-        break;
-      case "Pause":
-        player.pause();
-        sendMediaPlayState("Paused");
-        break;
-      case "Stop":
-        player.pause();
-        player.setSeek(0);
-        sendMediaPlayState("Paused");
-        break;
-      case "NextSong":
-        player.nextOrPrev("next");
-        break;
-      case "PreviousSong":
-        player.nextOrPrev("prev");
-        break;
-      case "Seek":
-        if (event.positionMs != null) {
-          player.setSeek(event.positionMs);
-        }
-        break;
-      case "ToggleShuffle":
-        player.toggleShuffle();
-        break;
-      case "ToggleRepeat":
-        player.toggleRepeat();
-        break;
-      case "SetRate":
-        if (event.rate != null) {
-          player.setRate(event.rate);
-        }
-        break;
-      case "SetVolume":
-        if (event.volume != null) {
-          player.setVolume(event.volume);
-        }
-        break;
-    }
-  }
 
   /**
    * 初始化媒体会话
@@ -96,39 +22,6 @@ class MediaSessionManager {
     const statusStore = useStatusStore();
 
     this.currentRate = statusStore.playRate;
-
-    if (isElectron) {
-      window.electron.ipcRenderer.removeAllListeners("media-event");
-      window.electron.ipcRenderer.on("media-event", (_, event) => {
-        this.handleMediaEvent(event, player);
-      });
-
-      // 同步初始播放模式状态
-      const shuffle = statusStore.shuffleMode !== "off";
-      const repeat =
-        statusStore.repeatMode === "list"
-          ? "List"
-          : statusStore.repeatMode === "one"
-            ? "Track"
-            : "None";
-      sendMediaPlayMode(shuffle, repeat);
-      player.syncMediaPlayMode();
-
-      // 同步初始播放速率
-      sendMediaPlaybackRate(statusStore.playRate);
-
-      // Discord RPC 初始化
-      if (settingStore.discordRpc.enabled) {
-        enableDiscordRpc();
-        updateDiscordConfig({
-          showWhenPaused: settingStore.discordRpc.showWhenPaused,
-          displayMode: settingStore.discordRpc.displayMode,
-        });
-      }
-
-      // 如果有原生集成则不需要 Web API
-      if (settingStore.smtcOpen) return;
-    }
 
     // Web API 初始化
     if ("mediaSession" in navigator) {
@@ -147,77 +40,17 @@ class MediaSessionManager {
    * 更新元数据
    */
   public async updateMetadata() {
-    if (!("mediaSession" in navigator) && !isElectron) return;
+    if (!("mediaSession" in navigator)) return;
     const musicStore = useMusicStore();
-    const settingStore = useSettingStore();
     const song = getPlaySongData();
     if (!song) return;
-    if (this.metadataAbortController) {
-      this.metadataAbortController.abort();
-    }
-    this.metadataAbortController = new AbortController();
-    const { signal } = this.metadataAbortController;
     const metadata = this.buildMetadata(song);
-    // 原生插件
-    if (this.shouldUseNativeMedia() && settingStore.smtcOpen) {
-      try {
-        let coverBuffer: Uint8Array | undefined;
-        // 本地文件且封面不是 Blob URL
-        if (song.path && !metadata.coverUrl.startsWith("blob:")) {
-          try {
-            const coverData = await window.electron.ipcRenderer.invoke(
-              "get-music-cover",
-              song.path,
-            );
-            if (coverData?.data && !signal.aborted) {
-              coverBuffer = new Uint8Array(coverData.data);
-            }
-          } catch {
-            // 忽略读取失败
-          }
-        }
-        // 在线歌曲
-        else if (
-          metadata.coverUrl &&
-          (metadata.coverUrl.startsWith("http") || metadata.coverUrl.startsWith("blob:"))
-        ) {
-          try {
-            const resp = await fetch(metadata.coverUrl, { signal });
-            coverBuffer = new Uint8Array(await resp.arrayBuffer());
-          } catch {
-            // 忽略下载失败
-          }
-        }
-        sendMediaMetadata({
-          songName: metadata.title,
-          authorName: metadata.artist,
-          albumName: metadata.album,
-          originalCoverUrl: metadata.coverUrl,
-          coverData: coverBuffer as Buffer,
-          duration: song.duration,
-          ncmId: typeof song.id === "number" ? song.id : undefined,
-        });
-      } catch (e) {
-        if (!(e instanceof DOMException && e.name === "AbortError")) {
-          console.error("[Media] 更新元数据失败", e);
-        }
-      } finally {
-        if (this.metadataAbortController?.signal === signal) {
-          this.metadataAbortController = null;
-        }
-      }
-      return;
-    }
-
-    // Web API
-    if ("mediaSession" in navigator) {
-      navigator.mediaSession.metadata = new window.MediaMetadata({
-        title: metadata.title,
-        artist: metadata.artist,
-        album: metadata.album,
-        artwork: this.buildArtwork(musicStore),
-      });
-    }
+    navigator.mediaSession.metadata = new window.MediaMetadata({
+      title: metadata.title,
+      artist: metadata.artist,
+      album: metadata.album,
+      artwork: this.buildArtwork(musicStore),
+    });
   }
 
   /**
@@ -285,36 +118,17 @@ class MediaSessionManager {
    * 更新播放进度
    * @param duration 总时长
    * @param position 当前位置
-   * @param immediate 是否立即发送，用于 Seek 操作
+   * @param immediate 是否立即同步，用于 Seek 操作
    */
   public updateState(duration: number, position: number, immediate: boolean = false) {
     const settingStore = useSettingStore();
     if (!settingStore.smtcOpen) return;
 
-    // 原生插件
-    if (this.shouldUseNativeMedia()) {
-      if (immediate) {
-        this.throttledSendTimeline.cancel();
-        // 绝对位置更新，避免 Seek 操作的进度更新被限流丢弃
-        sendMediaTimeline(position, duration, true);
-      } else {
-        this.throttledSendTimeline(position, duration);
-      }
-      return;
+    // Seek 时跳过限流立即同步，避免进度跳变被丢弃
+    if (immediate) {
+      this.throttledUpdatePositionState.cancel();
     }
-
-    // Web API
     this.throttledUpdatePositionState(duration, position);
-  }
-
-  /**
-   * 更新播放状态
-   */
-  public updatePlaybackStatus(isPlaying: boolean) {
-    // 发送到原生插件
-    if (this.shouldUseNativeMedia()) {
-      sendMediaPlayState(isPlaying ? "Playing" : "Paused");
-    }
   }
 
   /**
@@ -322,16 +136,6 @@ class MediaSessionManager {
    */
   public updatePlaybackRate(rate: number) {
     this.currentRate = rate;
-
-    if (this.shouldUseNativeMedia()) {
-      sendMediaPlaybackRate(rate);
-    }
-  }
-
-  public updateVolume(volume: number) {
-    if (this.shouldUseNativeMedia()) {
-      sendMediaVolume(volume);
-    }
   }
 
   /**

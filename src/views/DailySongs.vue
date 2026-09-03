@@ -103,6 +103,9 @@ onMounted(updateDailySongsData);
       font-size: 55px;
       font-weight: bold;
       animation: fade-spacing 1s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+      line-height: 1.1;
+      max-width: 100%;
+      text-align: center;
     }
     .tip {
       font-size: 16px;
@@ -110,6 +113,9 @@ onMounted(updateDailySongsData);
       opacity: 0;
       animation: fade-down 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
       animation-delay: 0.5s;
+      max-width: 100%;
+      text-align: center;
+      padding: 0 16px;
     }
     .menu {
       margin-top: 30px;
@@ -117,6 +123,23 @@ onMounted(updateDailySongsData);
   }
   .song-list {
     height: auto;
+  }
+  @media (max-width: 768px) {
+    .title {
+      height: auto;
+      padding: 16px 16px 8px;
+      margin-bottom: 12px;
+      .name {
+        font-size: 30px;
+      }
+      .tip {
+        font-size: 13px;
+        padding: 0 16px;
+      }
+      .menu {
+        margin-top: 16px;
+      }
+    }
   }
 }
 </style>

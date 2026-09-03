@@ -137,7 +137,6 @@ import { type LyricWord, type LyricLine } from "@applemusic-like-lyrics/lyric";
 import { useMusicStore, useSettingStore, useStatusStore } from "@/stores";
 import { usePlayerController } from "@/core/player/PlayerController";
 import { getLyricLanguage } from "@/utils/format";
-import { isElectron } from "@/utils/env";
 import { lyricLangFontStyle } from "@/utils/lyric/lyricFontConfig";
 import { getFontSize } from "@/utils/style";
 
@@ -526,9 +525,6 @@ onMounted(() => {
   nextTick().then(() => {
     lyricsScroll(firstActiveIndex.value);
   });
-  if (isElectron) {
-    window.electron.ipcRenderer.on("lyricsScroll", () => lyricsScroll(firstActiveIndex.value));
-  }
 });
 
 onBeforeUnmount(() => {
@@ -541,9 +537,6 @@ onBeforeUnmount(() => {
   if (userScrollTimeoutId !== null) {
     clearTimeout(userScrollTimeoutId);
     userScrollTimeoutId = null;
-  }
-  if (isElectron) {
-    window.electron.ipcRenderer.removeAllListeners("lyricsScroll");
   }
 });
 </script>
@@ -851,6 +844,19 @@ onBeforeUnmount(() => {
         transform: scale(0.76);
         &.on {
           transform: scale(0.9);
+        }
+      }
+    }
+    @media (max-width: 768px) {
+      .lyric-scroll-container {
+        padding: 0 20px;
+      }
+      .lyric-content {
+        .lrc-line {
+          transform: scale(0.9);
+          &.on {
+            transform: scale(1);
+          }
         }
       }
     }

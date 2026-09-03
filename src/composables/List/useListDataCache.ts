@@ -1,6 +1,5 @@
 import type { CoverType, SongType } from "@/types/main";
-import { useCacheManager } from "@/core/resource/CacheManager";
-import { isElectron } from "@/utils/env";
+import localforage from "localforage";
 
 /**
  * 列表类型
@@ -28,13 +27,18 @@ export interface ListCacheData {
 /** 缓存版本号 */
 const CACHE_VERSION = 2; // Bump version due to logic change
 
+// 列表缓存 DB
+const listCacheDB = localforage.createInstance({
+  name: "list-data",
+  description: "Cached data of the list",
+  storeName: "list",
+});
+
 /**
  * 列表数据缓存组合式函数
  * 提供列表缓存的读写功能
  */
 export const useListDataCache = () => {
-  const cacheManager = useCacheManager();
-
   /**
    * 生成缓存 key
    * @param type 列表类型
@@ -57,8 +61,6 @@ export const useListDataCache = () => {
     detail: CoverType,
     songs: SongType[],
   ): Promise<void> => {
-    if (!isElectron) return;
-
     const cacheData: ListCacheData = {
       version: CACHE_VERSION,
       timestamp: Date.now(),
@@ -69,10 +71,9 @@ export const useListDataCache = () => {
     };
 
     const key = getCacheKey(type, id);
-    const jsonStr = JSON.stringify(cacheData);
 
     try {
-      await cacheManager.set("list-data", key, jsonStr);
+      await listCacheDB.setItem(key, cacheData);
       console.log(`✅ List cache saved: ${key}`);
     } catch (error) {
       console.error(`❌ Failed to save list cache: ${key}`, error);
@@ -86,19 +87,13 @@ export const useListDataCache = () => {
    * @returns 缓存数据，如果不存在或已过期则返回 null
    */
   const loadCache = async (type: ListType, id: number): Promise<ListCacheData | null> => {
-    if (!isElectron) return null;
-
     const key = getCacheKey(type, id);
 
     try {
-      const result = await cacheManager.get("list-data", key);
-      if (!result.success || !result.data) {
+      const cacheData = (await listCacheDB.getItem(key)) as ListCacheData | null;
+      if (!cacheData) {
         return null;
       }
-
-      // 将 Uint8Array 转换为字符串
-      const jsonStr = new TextDecoder().decode(result.data);
-      const cacheData: ListCacheData = JSON.parse(jsonStr);
 
       // 检查版本
       if (cacheData.version !== CACHE_VERSION) {
@@ -157,12 +152,10 @@ export const useListDataCache = () => {
    * @param id 列表 ID
    */
   const removeCache = async (type: ListType, id: number): Promise<void> => {
-    if (!isElectron) return;
-
     const key = getCacheKey(type, id);
 
     try {
-      await cacheManager.remove("list-data", key);
+      await listCacheDB.removeItem(key);
       console.log(`🗑️ List cache removed: ${key}`);
     } catch (error) {
       console.error(`❌ Failed to remove list cache: ${key}`, error);
@@ -173,10 +166,8 @@ export const useListDataCache = () => {
    * 清除所有列表缓存
    */
   const clearAllCache = async (): Promise<void> => {
-    if (!isElectron) return;
-
     try {
-      await cacheManager.clear("list-data");
+      await listCacheDB.clear();
       console.log(`🗑️ All list cache cleared`);
     } catch (error) {
       console.error(`❌ Failed to clear list cache`, error);

@@ -38,10 +38,6 @@ export interface SettingState {
   englishLyricFont: "follow" | string;
   /** 韩语歌词字体 */
   koreanLyricFont: "follow" | string;
-  /** 隐藏 VIP 标签 */
-  showCloseAppTip: boolean;
-  /** 关闭应用方式 */
-  closeAppMethod: "exit" | "hide";
   /** 显示任务栏进度 */
   showTaskbarProgress: boolean;
   /** 任务栏歌词跟随主题色 */
@@ -172,6 +168,8 @@ export interface SettingState {
   useSongUnlock: boolean;
   /** 歌曲解锁音源 */
   songUnlockServer: { key: SongUnlockServer; enabled: boolean }[];
+  /** 服务端解灰音源（空 = 跟随服务端默认顺序） */
+  unblockSources: string[];
   /** 显示倒计时 */
   countDownShow: boolean;
   /** 显示歌词条 */
@@ -354,8 +352,6 @@ export interface SettingState {
     hideCloud: boolean;
     /** 隐藏下载管理 */
     hideDownload: boolean;
-    /** 隐藏本地歌曲 */
-    hideLocal: boolean;
     /** 隐藏最近播放 */
     hideHistory: boolean;
     /** 隐藏创建的歌单 */
@@ -508,8 +504,6 @@ export const useSettingStore = defineStore("setting", {
     playerExpandAnimation: "up",
     useOnlineService: true,
     shareUrlFormat: "web",
-    showCloseAppTip: true,
-    closeAppMethod: "hide",
     showTaskbarProgress: false,
     taskbarLyricUseThemeColor: false,
     checkUpdateOnStart: true,
@@ -531,6 +525,7 @@ export const useSettingStore = defineStore("setting", {
       { key: SongUnlockServer.NETEASE, enabled: true },
       { key: SongUnlockServer.KUWO, enabled: false },
     ],
+    unblockSources: [],
     countDownShow: true,
     barLyricShow: true,
     timeFormat: "current-total",
@@ -659,7 +654,6 @@ export const useSettingStore = defineStore("setting", {
       hideLike: false,
       hideCloud: false,
       hideDownload: false,
-      hideLocal: false,
       hideHistory: false,
       hideUserPlaylists: false,
       hideLikedPlaylists: false,

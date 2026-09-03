@@ -364,11 +364,15 @@ const albumName = computed(() => {
         min-width: 0;
         margin-top: 2px;
         font-size: 13px;
+        flex-wrap: wrap;
+        row-gap: 4px;
+        max-width: 100%;
         .n-tag {
           --n-height: 18px;
           font-size: 10px;
           cursor: pointer;
           pointer-events: none;
+          flex-shrink: 0;
           &:last-child {
             margin-right: 0;
           }
@@ -392,6 +396,9 @@ const albumName = computed(() => {
         .mv {
           pointer-events: auto;
         }
+      }
+      .artists {
+        max-width: 100%;
       }
       .artists {
         flex: 1;
@@ -497,6 +504,37 @@ const albumName = computed(() => {
           }
         }
       }
+    }
+  }
+  @media (max-width: 768px) {
+    .title {
+      .info {
+        .name {
+          font-size: 15px;
+        }
+        .desc {
+          font-size: 12px;
+        }
+      }
+    }
+  }
+  @media (max-width: 512px) {
+    height: 78px;
+    .title {
+      .cover {
+        width: 44px;
+        height: 44px;
+        min-width: 44px;
+        margin-right: 10px;
+      }
+      .info {
+        .name {
+          font-size: 14px;
+        }
+      }
+    }
+    .actions {
+      width: 32px;
     }
   }
 }

@@ -63,19 +63,6 @@ export default [
     },
   },
   {
-    files: [".github/scripts/prepare-release-assets.cjs"],
-
-    languageOptions: {
-      globals: { ...globals.node },
-      ecmaVersion: 5,
-      sourceType: "commonjs",
-    },
-
-    rules: {
-      "@typescript-eslint/no-require-imports": "off",
-    },
-  },
-  {
     files: ["**/.eslintrc.{js,cjs}"],
 
     languageOptions: {

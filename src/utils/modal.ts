@@ -1,9 +1,8 @@
-import type { CoverType, UpdateInfoType, SettingType, SongType } from "@/types/main";
-import { CURRENT_AGREEMENT_VERSION } from "@/constants/agreement";
+import type { CoverType, SettingType, SongType } from "@/types/main";
 import { NScrollbar } from "naive-ui";
 import { isLogin } from "./auth";
 import { isArray, isFunction } from "lodash-es";
-import { useDataStore, useSettingStore } from "@/stores";
+import { useDataStore } from "@/stores";
 import router from "@/router";
 import type { StreamingServerConfig as StreamingServerConfigType } from "@/types/streaming";
 
@@ -39,33 +38,7 @@ const setModalClosed = (modalKey: string): void => {
 };
 
 export const openUserAgreement = async () => {
-  const settingStore = useSettingStore();
-  // 检查是否需要重新同意协议
-  const needReAgree = settingStore.userAgreementVersion !== CURRENT_AGREEMENT_VERSION;
-  // 如果已经同意了当前版本，则不需要再弹窗
-  if (!needReAgree) return;
-  const { default: UserAgreement } = await import("@/components/Modal/UserAgreement.vue");
-  const modal = window.$modal.create({
-    preset: "card",
-    transformOrigin: "center",
-    autoFocus: false,
-    maskClosable: false,
-    closeOnEsc: false,
-    closable: false,
-    style: {
-      maxWidth: "70vw",
-    },
-    content: () => {
-      return h(UserAgreement, {
-        onClose: () => {
-          modal.destroy();
-        },
-      });
-    },
-    onEsc: () => {
-      window.$message.warning("请先阅读并同意用户协议");
-    },
-  });
+  // 已停用：首次打开不再弹出用户协议
 };
 
 /** 打开歌单界面配置弹窗 */
@@ -168,22 +141,6 @@ export const openJumpArtist = async (data: SongType["artists"], id?: number) => 
     title: "跳转到歌手",
     content: () => {
       return h(JumpArtist, { artist: data, onClose: () => modal.destroy() });
-    },
-  });
-};
-
-// 编辑歌曲信息
-export const openSongInfoEditor = async (song: SongType) => {
-  const { default: SongInfoEditor } = await import("@/components/Modal/SongInfoEditor.vue");
-  const modal = window.$modal.create({
-    preset: "card",
-    transformOrigin: "center",
-    autoFocus: false,
-    trapFocus: false,
-    style: { width: "600px" },
-    title: "编辑歌曲信息",
-    content: () => {
-      return h(SongInfoEditor, { song, onClose: () => modal.destroy() });
     },
   });
 };
@@ -350,21 +307,6 @@ export const openSetting = async (type: SettingType = "general", scrollTo?: stri
     },
     onAfterLeave: () => {
       setModalClosed("setting");
-    },
-  });
-};
-
-// 软件更新
-export const openUpdateApp = async (data: UpdateInfoType) => {
-  const { default: UpdateApp } = await import("@/components/Modal/UpdateApp.vue");
-  const modal = window.$modal.create({
-    preset: "card",
-    transformOrigin: "center",
-    autoFocus: false,
-    style: { width: "600px" },
-    title: "发现新版本",
-    content: () => {
-      return h(UpdateApp, { data, onClose: () => modal.destroy() });
     },
   });
 };
@@ -649,41 +591,6 @@ export const openThemeConfig = async () => {
     },
     onAfterLeave: () => {
       setModalClosed("themeConfig");
-    },
-  });
-};
-
-/** 打开界面缩放调整弹窗 */
-export const openScalingModal = async () => {
-  const { default: ScalingModal } = await import("@/components/Modal/ScalingModal.vue");
-  window.$modal.create({
-    preset: "card",
-    transformOrigin: "center",
-    size: "small",
-    autoFocus: false,
-    showMask: false,
-    style: { width: "400px" },
-    title: "界面缩放",
-    content: () => {
-      return h(ScalingModal);
-    },
-  });
-};
-
-/** 打开本地音乐目录管理弹窗 */
-export const openLocalMusicDirectoryModal = async () => {
-  const { default: LocalMusicDirectory } =
-    await import("@/components/Modal/Setting/LocalMusicDirectory.vue");
-  window.$modal.create({
-    preset: "card",
-    transformOrigin: "center",
-    autoFocus: false,
-    maskClosable: false,
-    closeOnEsc: false,
-    style: { width: "600px" },
-    title: "目录管理",
-    content: () => {
-      return h(LocalMusicDirectory);
     },
   });
 };

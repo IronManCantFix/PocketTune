@@ -125,6 +125,8 @@ export interface AudioStreamDecoder extends EmbindObject {
 }
 
 export interface AudioDecoderModule extends EmscriptenModule {
+  // wasm 运行时堆视图（Emscripten 基础类型未声明）
+  HEAPU8: Uint8Array;
   FS: typeof FS & {
     filesystems: {
       WORKERFS: Emscripten.FileSystemType;

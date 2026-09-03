@@ -259,7 +259,9 @@ onMounted(getAllCloudMusic);
   .menu {
     width: 100%;
     margin-bottom: 20px;
-    height: 40px;
+    min-height: 40px;
+    flex-wrap: wrap;
+    gap: 8px;
     .n-button {
       height: 40px;
     }

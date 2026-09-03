@@ -124,7 +124,6 @@
 <script setup lang="ts">
 import { useMusicStore, useStatusStore, useSettingStore, useDataStore } from "@/stores";
 import { useBlobURLManager } from "@/core/resource/BlobURLManager";
-import { isElectron } from "@/utils/env";
 import { useMobile } from "@/composables/useMobile";
 import { useInit } from "@/composables/useInit";
 
@@ -168,14 +167,13 @@ useInit();
 
 onMounted(() => {
   loadBackgroundImage();
-  if (!isElectron) {
-    window.addEventListener("beforeunload", (event) => {
-      event.preventDefault();
-      // 释放所有 blob URL
-      blobURLManager.revokeAllBlobURLs();
-      event.returnValue = "";
-    });
-  }
+  // 页面卸载前释放所有 blob URL
+  window.addEventListener("beforeunload", (event) => {
+    event.preventDefault();
+    // 释放所有 blob URL
+    blobURLManager.revokeAllBlobURLs();
+    event.returnValue = "";
+  });
 });
 </script>
 
@@ -249,9 +247,6 @@ onMounted(() => {
   &.show-full-player {
     opacity: 0;
     transform: scale(0.9);
-    #main-header {
-      -webkit-app-region: no-drag;
-    }
   }
 }
 </style>

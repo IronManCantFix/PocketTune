@@ -9,6 +9,7 @@ lerna-debug.log*
 task.md
 
 node_modules
+.pnpm-store
 .DS_Store
 dist
 dist-ssr
@@ -18,6 +19,9 @@ out
 .env
 target
 *.node
+
+# SDD 执行台账
+.superpowers
 
 # Editor directories and files
 .vscode/*

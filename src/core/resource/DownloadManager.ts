@@ -1,33 +1,16 @@
 import type { SongType, SongLevelType } from "@/types/main";
 import { useDataStore, useSettingStore } from "@/stores";
-import { isElectron } from "@/utils/env";
 import { saveAs } from "file-saver";
-import { cloneDeep } from "lodash-es";
 import { songDownloadUrl, songLyric, songUrl, unlockSongUrl, songLyricTTML } from "@/api/song";
 import { qqMusicMatch } from "@/api/qqmusic";
 import { songLevelData } from "@/utils/meta";
 import { getPlayerInfoObj } from "@/utils/format";
+import { toProxiedUrl } from "@/utils/helper";
 import { LyricProcessor, type LyricProcessorOptions, type LyricResult } from "./LyricProcessor";
-import { albumDetail } from "@/api/album";
-
-const albumArtistCache = new Map<number, string[] | Promise<string[]>>();
-const MAX_ALBUM_ARTIST_CACHE_SIZE = 100;
 
 interface DownloadConfig {
   fileName: string;
   fileType: string;
-  path: string;
-  downloadMeta: boolean;
-  downloadCover: boolean;
-  downloadLyric: boolean;
-  saveMetaFile: boolean;
-  songData: SongType;
-  lyric: string;
-  albumArtists: string[];
-  skipIfExist: boolean;
-  threadCount: number;
-  referer?: string;
-  enableDownloadHttp2: boolean;
 }
 
 interface DownloadStrategy {
@@ -36,14 +19,14 @@ interface DownloadStrategy {
   readonly song: SongType;
   readonly downloadUrl: string;
 
-  // 准备阶段：获取链接，获取歌词，处理元数据
+  // 准备阶段：获取链接，获取歌词
   prepare(): Promise<void>;
 
-  // 执行阶段：返回给 Electron 下载器需要的配置对象
+  // 执行阶段：返回下载需要的配置对象
   getDownloadConfig(): DownloadConfig;
 
-  // 收尾阶段：处理 ASS 生成，歌词文件写入
-  postProcess(downloadedFilePath: string): Promise<void>;
+  // 收尾阶段：处理逐字歌词/ASS 歌词文件保存
+  postProcess(): Promise<void>;
 }
 
 /**
@@ -57,10 +40,8 @@ class SongDownloadStrategy implements DownloadStrategy {
   private _downloadUrl = "";
   private fileType = "mp3";
   private lyricResult: LyricResult | null = null;
-  private basicLyric = "";
   private ttmlLyric = "";
   private yrcLyric = "";
-  private albumArtists: string[] = [];
 
   constructor(
     public readonly song: SongType,
@@ -86,16 +67,6 @@ class SongDownloadStrategy implements DownloadStrategy {
     // 获取歌词
     if (this.shouldDownloadLyrics()) {
       this.lyricResult = (await songLyric(this.song.id)) as LyricResult;
-
-      const options: LyricProcessorOptions = {
-        downloadLyricToTraditional: this.settingStore.downloadLyricToTraditional,
-        downloadLyricTranslation: this.settingStore.downloadLyricTranslation,
-        downloadLyricRomaji: this.settingStore.downloadLyricRomaji,
-        downloadLyricEncoding: this.settingStore.downloadLyricEncoding,
-      };
-
-      // 处理基础歌词
-      this.basicLyric = await LyricProcessor.processBasic(this.lyricResult, options);
 
       // 处理逐字歌词 (后续使用)
       const { downloadMakeYrc, downloadSaveAsAss } = this.settingStore;
@@ -131,80 +102,22 @@ class SongDownloadStrategy implements DownloadStrategy {
         this.yrcLyric = verbatim.yrc;
       }
     }
-
-    // 处理专辑艺术家信息
-    if (this.settingStore.downloadMeta) {
-      const album = this.song.album;
-      if (typeof album !== "string") {
-        const cached = albumArtistCache.get(album.id);
-        if (cached instanceof Array) {
-          this.albumArtists = cached;
-        } else if (cached instanceof Promise) {
-          this.albumArtists = await cached;
-        } else {
-          const promise = albumDetail(album.id)
-            .then((res) => {
-              if (res.code === 200) {
-                const artistName = res?.album?.artists?.map((a) => a.name) || [];
-                albumArtistCache.set(album.id, artistName);
-                // 控制缓存大小
-                if (albumArtistCache.size > MAX_ALBUM_ARTIST_CACHE_SIZE) {
-                  for (const [k, v] of albumArtistCache) {
-                    if (v instanceof Array) {
-                      albumArtistCache.delete(k);
-                      if (albumArtistCache.size < MAX_ALBUM_ARTIST_CACHE_SIZE) break;
-                    }
-                  }
-                }
-                return artistName;
-              }
-              return [];
-            })
-            .catch((e) => {
-              console.error(`获取专辑艺术家失败: ${album.id}`, e);
-              return [];
-            });
-          albumArtistCache.set(album.id, promise);
-          this.albumArtists = await promise;
-        }
-      }
-    }
   }
   /**
    * 获取下载配置
    * @returns 下载配置
    */
   getDownloadConfig(): DownloadConfig {
-    const fileName = this.getFileName();
-    const targetPath = this.getDownloadPath();
-    const { downloadMeta, downloadCover, saveMetaFile, downloadThreadCount, enableDownloadHttp2 } =
-      this.settingStore;
-
     return {
-      fileName,
+      fileName: this.getFileName(),
       fileType: this.fileType,
-      path: targetPath,
-      downloadMeta: downloadMeta,
-      downloadCover: downloadCover && downloadMeta,
-      downloadLyric: this.shouldDownloadLyrics(),
-      saveMetaFile: downloadMeta && saveMetaFile,
-      songData: cloneDeep(this.song),
-      lyric: this.basicLyric,
-      albumArtists: this.albumArtists,
-      skipIfExist: true,
-      threadCount: downloadThreadCount,
-      enableDownloadHttp2: enableDownloadHttp2,
     };
   }
   /**
-   * 后置处理
-   * @param downloadedFilePath 下载文件路径
+   * 后置处理：生成逐字歌词/ASS 文件并通过 Blob 保存
    */
-  async postProcess(downloadedFilePath: string): Promise<void> {
-    console.log(`Post-processing file: ${downloadedFilePath}`);
-    // 使用存储的文件名和路径
+  async postProcess(): Promise<void> {
     const fileName = this.getFileName();
-    const targetPath = this.getDownloadPath();
     const { downloadMakeYrc, downloadSaveAsAss } = this.settingStore;
 
     const options: LyricProcessorOptions = {
@@ -221,14 +134,9 @@ class SongDownloadStrategy implements DownloadStrategy {
         this.lyricResult,
         options,
       );
-      if (result && window.electron?.ipcRenderer) {
-        await window.electron.ipcRenderer.invoke("save-file", {
-          targetPath,
-          fileName,
-          ext: result.ext,
-          content: result.content,
-          encoding: result.encoding,
-        });
+      if (result && result.content) {
+        // web 环境通过 Blob 保存歌词文件
+        saveAs(new Blob([result.content], { type: "text/plain" }), `${fileName}.${result.ext}`);
       }
     }
 
@@ -245,14 +153,9 @@ class SongDownloadStrategy implements DownloadStrategy {
         options,
       );
 
-      if (result && window.electron?.ipcRenderer) {
-        await window.electron.ipcRenderer.invoke("save-file", {
-          targetPath,
-          fileName,
-          ext: "ass",
-          content: result.content,
-          encoding: result.encoding,
-        });
+      if (result && result.content) {
+        // web 环境通过 Blob 保存歌词文件
+        saveAs(new Blob([result.content], { type: "text/plain" }), `${fileName}.ass`);
       }
     }
   }
@@ -353,22 +256,6 @@ class SongDownloadStrategy implements DownloadStrategy {
 
     return displayName.replace(/[/:*?"<>|]/g, "&");
   }
-  /**
-   * 获取下载路径
-   * @returns 下载路径
-   */
-  private getDownloadPath(): string {
-    const finalPath = this.settingStore.downloadPath;
-    const infoObj = getPlayerInfoObj(this.song) || { artist: "未知歌手", album: "未知专辑" };
-    const safeArtist = (infoObj.artist || "未知歌手").replace(/[/:*?"<>|]/g, "&");
-    const safeAlbum = (infoObj.album || "未知专辑").replace(/[/:*?"<>|]/g, "&");
-    const { folderStrategy } = this.settingStore;
-
-    if (folderStrategy === "artist") return `${finalPath}/${safeArtist}`;
-    else if (folderStrategy === "artist-album") return `${finalPath}/${safeArtist}/${safeAlbum}`;
-    return finalPath;
-  }
-
   private shouldDownloadLyrics(): boolean {
     return this.settingStore.downloadLyric && this.settingStore.downloadMeta;
   }
@@ -382,14 +269,9 @@ class DownloadManager {
   private maxConcurrent: number = 1;
   private initialized: boolean = false;
 
-  constructor() {
-    this.setupIpcListeners();
-  }
-
   public init() {
     if (this.initialized) return;
     this.initialized = true;
-    if (!isElectron) return;
 
     const dataStore = useDataStore();
 
@@ -416,36 +298,13 @@ class DownloadManager {
     this.processQueue();
   }
   /**
-   * 设置 IPC 监听器
-   */
-  private setupIpcListeners() {
-    if (typeof window === "undefined" || !window.electron?.ipcRenderer) return;
-    window.electron.ipcRenderer.on("download-progress", (_event, progress) => {
-      const { id, percent, transferredBytes, totalBytes } = progress;
-      if (!id) return;
-      const dataStore = useDataStore();
-      const transferred = transferredBytes
-        ? (transferredBytes / 1024 / 1024).toFixed(2) + "MB"
-        : "0MB";
-      const total = totalBytes ? (totalBytes / 1024 / 1024).toFixed(2) + "MB" : "0MB";
-      dataStore.updateDownloadProgress(id, Number((percent * 100).toFixed(1)), transferred, total);
-    });
-  }
-  /**
    * 获取已下载的歌曲
+   * web 环境暂不支持读取下载目录
    * @returns 已下载的歌曲列表
    */
   public async getDownloadedSongs(): Promise<Record<string, unknown>[]> {
-    const settingStore = useSettingStore();
-    if (!isElectron) return [];
-    const downloadPath = settingStore.downloadPath;
-    if (!downloadPath) return [];
-    try {
-      return await window.electron.ipcRenderer.invoke("get-downloaded-songs", downloadPath);
-    } catch (error) {
-      console.error("Failed to get downloaded songs:", error);
-      return [];
-    }
+    // web 环境暂不支持读取下载目录
+    return [];
   }
   /**
    * 添加下载任务
@@ -554,32 +413,13 @@ class DownloadManager {
       await strategy.prepare();
       const config = strategy.getDownloadConfig();
 
-      if (isElectron) {
-        if (!strategy.downloadUrl) throw new Error("Download URL missing");
-
-        const downloadResult = await window.electron.ipcRenderer.invoke(
-          "download-file",
-          strategy.downloadUrl,
-          config,
-        );
-
-        if (downloadResult.status === "success" || downloadResult.status === "skipped") {
-          await strategy.postProcess(downloadResult.path || config.path); // IPC 返回结果通常包含路径
-          dataStore.removeDownloadingSong(strategy.id);
-          window.$message.success(`${strategy.name} 下载完成`);
-        } else {
-          if (downloadResult.status === "cancelled") {
-            // 已取消，无需处理
-          } else {
-            throw new Error(downloadResult.message || "下载失败");
-          }
-        }
-      } else {
-        // 浏览器端兜底处理
-        if (!strategy.downloadUrl) throw new Error("Download URL missing");
-        saveAs(strategy.downloadUrl, config.fileName + "." + config.fileType);
-        dataStore.removeDownloadingSong(strategy.id);
-      }
+      // 浏览器端下载：统一经同源代理触发保存（跨源地址会丢失 download 属性）
+      if (!strategy.downloadUrl) throw new Error("Download URL missing");
+      saveAs(toProxiedUrl(strategy.downloadUrl, true), config.fileName + "." + config.fileType);
+      // 生成并保存歌词文件（如开启）
+      await strategy.postProcess();
+      dataStore.removeDownloadingSong(strategy.id);
+      window.$message.success(`${strategy.name} 下载完成`);
     } catch (error: any) {
       console.error(`Error processing task ${strategy.name} (ID: ${strategy.id}):`, error);
       if (error?.message) console.error("Error message:", error.message);

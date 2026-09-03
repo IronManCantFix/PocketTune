@@ -88,20 +88,6 @@
           </template>
           添加到歌单
         </n-button>
-        <!-- 删除本地歌曲 -->
-        <n-button
-          v-if="props.isLocal"
-          :disabled="!checkCount"
-          type="error"
-          strong
-          secondary
-          @click="handleDeleteLocalSongs"
-        >
-          <template #icon>
-            <SvgIcon name="Delete" />
-          </template>
-          删除歌曲
-        </n-button>
       </n-flex>
     </n-flex>
   </div>
@@ -113,11 +99,10 @@ import type { SongType } from "@/types/main";
 import { isArray, isObject } from "lodash-es";
 import { openPlaylistAdd } from "@/utils/modal";
 import { deleteSongs } from "@/utils/auth";
-import { NInput, NInputNumber, NButton, NText, NFlex } from "naive-ui";
-import { useLocalStore, useStatusStore } from "@/stores";
+import { NInputNumber, NButton, NText, NFlex } from "naive-ui";
+import { useStatusStore } from "@/stores";
 import { openDownloadSongs } from "@/utils/modal";
 
-const localStore = useLocalStore();
 const statusStore = useStatusStore();
 
 interface DataType {
@@ -227,81 +212,6 @@ const handleRangeSelect = () => {
   checkedRowKeys.value = selectedRows.map((row) => row.key as DataTableRowKey);
   checkCount.value = selectedRows.length;
   checkSongData.value = selectedRows.map((row) => row.origin).filter((song) => song) as SongType[];
-};
-
-// 删除本地歌曲
-const handleDeleteLocalSongs = () => {
-  const confirmText = ref("");
-  window.$dialog.warning({
-    title: "删除歌曲",
-    content: () =>
-      h("div", { style: { marginTop: "20px" } }, [
-        h(
-          "div",
-          { style: { marginBottom: "12px" } },
-          "确定删除选中的歌曲吗？该操作将永久删除文件且无法撤销！",
-        ),
-        h(
-          "div",
-          { style: { marginBottom: "12px", fontSize: "12px", opacity: 0.8 } },
-          "请输入：确认删除",
-        ),
-        h(NInput, {
-          value: confirmText.value,
-          placeholder: "确认删除",
-          onUpdateValue: (v) => {
-            confirmText.value = v;
-          },
-        }),
-      ]),
-    positiveText: "删除",
-    negativeText: "取消",
-    onPositiveClick: async () => {
-      if (confirmText.value !== "确认删除") {
-        window.$message.error("输入内容不正确");
-        return false;
-      }
-
-      const loading = window.$message.loading("正在删除...", { duration: 0 });
-      try {
-        const deletePromises = checkSongData.value.map(async (song) => {
-          if (song.path) {
-            const result = await window.electron.ipcRenderer.invoke("delete-file", song.path);
-            return { id: song.id, success: result };
-          }
-          return { id: song.id, success: false };
-        });
-
-        const results = await Promise.all(deletePromises);
-        const successIds = results.filter((r) => r.success).map((r) => r.id);
-        const failCount = results.length - successIds.length;
-
-        // 更新本地数据
-        if (successIds.length > 0) {
-          // 从 localStore 中移除
-          const newLocalSongs = localStore.localSongs.filter(
-            (song) => !successIds.includes(song.id),
-          );
-          localStore.updateLocalSong(newLocalSongs);
-
-          window.$message.success(
-            `成功删除 ${successIds.length} 首歌曲` + (failCount > 0 ? `，${failCount} 首失败` : ""),
-          );
-          // 刷新列表
-          const localEventBus = useEventBus("local");
-          localEventBus.emit();
-        } else {
-          window.$message.error("删除失败，请重试");
-        }
-      } catch (error) {
-        console.error("批量删除失败:", error);
-        window.$message.error("删除过程中出现错误");
-      } finally {
-        loading.destroy();
-      }
-      return true;
-    },
-  });
 };
 
 // 批量下载处理

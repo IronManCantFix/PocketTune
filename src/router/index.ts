@@ -1,6 +1,5 @@
 import { createRouter, createWebHashHistory, Router } from "vue-router";
 import { openUserLogin } from "@/utils/modal";
-import { isElectron } from "@/utils/env";
 import { isLogin } from "@/utils/auth";
 import routes from "./routes";
 
@@ -29,22 +28,16 @@ const router: Router = createRouter({
 
 // 前置守卫
 router.beforeEach((to, from, next) => {
-  // console.log("前置守卫", to, from);
   // 进度条
-  if (!isElectron && to.path !== from.path) {
+  if (to.path !== from.path) {
     window.$loadingBar?.start();
   }
   // 需要登录
   if (to.meta.needLogin && !isLogin()) {
-    if (!isElectron) window.$loadingBar?.error();
+    window.$loadingBar?.error();
     window.$message?.warning("请登录后使用");
     openUserLogin();
     return;
-  }
-  // 需要客户端
-  else if (to.meta.needApp && !isElectron) {
-    window.$message?.warning("该功能为客户端独占功能");
-    next("/403");
   }
   next();
 });

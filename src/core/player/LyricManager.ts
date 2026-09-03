@@ -5,7 +5,6 @@ import { useCacheManager } from "@/core/resource/CacheManager";
 import { useMusicStore, useSettingStore, useStatusStore, useStreamingStore } from "@/stores";
 import type { LyricPriority, SongLyric } from "@/types/lyric";
 import type { SongType } from "@/types/main";
-import { isElectron } from "@/utils/env";
 import { applyBracketReplacement } from "@/utils/lyric/lyricFormat";
 import { applyProfanityUncensor } from "@/utils/lyric/lyricProfanity";
 import {
@@ -20,7 +19,7 @@ import { parseLrc } from "@/utils/lyric/parseLrc";
 import { getConverter } from "@/utils/opencc";
 import { type LyricLine, parseTTML, parseYrc } from "@applemusic-like-lyrics/lyric";
 import { cloneDeep, isEmpty } from "lodash-es";
-import { attachTtmlBgLines, cleanTTMLTranslations } from "@/utils/lyric/parseTTML";
+import { cleanTTMLTranslations } from "@/utils/lyric/parseTTML";
 
 interface LyricFetchResult {
   data: SongLyric;
@@ -77,7 +76,7 @@ class LyricManager {
    */
   private async getRawLyricCache(id: number, type: "lrc" | "ttml" | "qrc"): Promise<string | null> {
     const settingStore = useSettingStore();
-    if (!isElectron || !settingStore.cacheEnabled) return null;
+    if (!settingStore.cacheEnabled) return null;
     try {
       const cacheManager = useCacheManager();
       const ext = type === "ttml" ? "ttml" : type === "qrc" ? "qrc.json" : "json";
@@ -101,7 +100,7 @@ class LyricManager {
    */
   private async saveRawLyricCache(id: number, type: "lrc" | "ttml" | "qrc", data: string) {
     const settingStore = useSettingStore();
-    if (!isElectron || !settingStore.cacheEnabled) return;
+    if (!settingStore.cacheEnabled) return;
     try {
       const cacheManager = useCacheManager();
       const ext = type === "ttml" ? "ttml" : type === "qrc" ? "qrc.json" : "json";
@@ -388,6 +387,7 @@ class LyricManager {
 
   /**
    * 处理本地歌词
+   * web 环境暂不支持读取本地歌词文件，返回空结果
    * @param song 歌曲对象
    * @returns 歌词数据和元数据
    */
@@ -397,140 +397,23 @@ class LyricManager {
       meta: { usingTTMLLyric: false, usingQRCLyric: false },
     };
     if (!song.path) return defaultResult;
-
-    try {
-      const settingStore = useSettingStore();
-      const { lyric, format }: { lyric?: string; format?: "lrc" | "ttml" | "yrc" } =
-        await window.electron.ipcRenderer.invoke("get-music-lyric", song.path);
-      if (!lyric) return defaultResult;
-      // YRC 直接解析
-      if (format === "yrc") {
-        let lines: LyricLine[] = [];
-        // 检测是否为 XML 格式 (QRC)
-        if (lyric.trim().startsWith("<") || lyric.includes("<QrcInfos>")) {
-          lines = parseQRCLyric(lyric);
-        } else {
-          lines = parseYrc(lyric) || [];
-        }
-        return {
-          data: { lrcData: [], yrcData: lines },
-          meta: { usingTTMLLyric: false, usingQRCLyric: false },
-        };
-      }
-      // TTML 直接返回
-      if (format === "ttml") {
-        const sorted = cleanTTMLTranslations(lyric);
-        const ttml = parseTTML(sorted);
-        const lines = ttml?.lines || [];
-        return {
-          data: { lrcData: [], yrcData: lines },
-          meta: { usingTTMLLyric: true, usingQRCLyric: false },
-        };
-      }
-      // 解析本地歌词
-      const { format: lrcFormat, lines: parsedLines } = parseSmartLrc(lyric);
-      // 如果是逐字格式，直接作为 yrcData
-      if (isWordLevelFormat(lrcFormat)) {
-        return {
-          data: { lrcData: [], yrcData: parsedLines },
-          meta: { usingTTMLLyric: false, usingQRCLyric: false },
-        };
-      }
-      // 普通格式
-      let aligned: SongLyric = { lrcData: alignLyricLines(parsedLines), yrcData: [] };
-      let usingQRCLyric = false;
-      // 如果开启了本地歌曲 QQ 音乐匹配，尝试获取逐字歌词
-      if (settingStore.localLyricQQMusicMatch && song) {
-        const qqLyric = await this.fetchQQMusicLyric(song);
-        if (qqLyric && qqLyric.yrcData.length > 0) {
-          // 使用 QQ 音乐的逐字歌词，但保留本地歌词作为 lrcData
-          aligned = {
-            lrcData: aligned.lrcData,
-            yrcData: qqLyric.yrcData,
-          };
-          usingQRCLyric = true;
-        }
-      }
-      return {
-        data: aligned,
-        meta: { usingTTMLLyric: false, usingQRCLyric },
-      };
-    } catch {
-      return defaultResult;
-    }
+    // web 环境无法读取本地歌词文件，暂不支持本地歌词
+    return defaultResult;
   }
 
   /**
    * 检测本地歌词覆盖
-   * @param id 歌曲 ID
+   * web 环境暂不支持读取本地歌词目录，返回空结果
+   * @param _id 歌曲 ID（web 环境未使用，保留签名兼容）
    * @returns 歌词数据和元数据
    */
-  private async fetchLocalOverrideLyric(id: number): Promise<LyricFetchResult> {
-    const settingStore = useSettingStore();
-    const { localLyricPath } = settingStore;
+  private async fetchLocalOverrideLyric(_id: number): Promise<LyricFetchResult> {
     const defaultResult: LyricFetchResult = {
       data: { lrcData: [], yrcData: [] },
       meta: { usingTTMLLyric: false, usingQRCLyric: false }, // 覆盖默认没有 QRC
     };
-
-    if (!isElectron || !localLyricPath.length) return defaultResult;
-
-    // 从本地遍历
-    try {
-      const lyricDirs = Array.isArray(localLyricPath) ? localLyricPath.map((p) => String(p)) : [];
-      // 读取本地歌词
-      const { lrc, ttml } = await window.electron.ipcRenderer.invoke(
-        "read-local-lyric",
-        lyricDirs,
-        id,
-      );
-
-      // 安全解析 LRC
-      let lrcLines: LyricLine[] = [];
-      let lrcIsWordLevel = false;
-      try {
-        const lrcContent = typeof lrc === "string" ? lrc : "";
-        if (lrcContent) {
-          const { format: lrcFormat, lines } = parseSmartLrc(lrcContent);
-          lrcIsWordLevel = isWordLevelFormat(lrcFormat);
-          lrcLines = lines;
-          console.log("检测到本地歌词覆盖", lrcFormat, lrcLines);
-        }
-      } catch (err) {
-        console.error("parseLrc 本地解析失败:", err);
-        lrcLines = [];
-      }
-
-      // 安全解析 TTML
-      let ttmlLines: LyricLine[] = [];
-      try {
-        const ttmlContent = typeof ttml === "string" ? ttml : "";
-        if (ttmlContent) {
-          const cleaned = cleanTTMLTranslations(ttmlContent);
-          const raw = parseTTML(cleaned).lines || [];
-          ttmlLines = raw;
-          console.log("检测到本地TTML歌词覆盖", ttmlLines);
-        }
-      } catch (err) {
-        console.error("parseTTML 本地解析失败:", err);
-        ttmlLines = [];
-      }
-
-      if (lrcIsWordLevel && lrcLines.length > 0) {
-        return {
-          data: { lrcData: [], yrcData: lrcLines },
-          meta: { usingTTMLLyric: false, usingQRCLyric: false },
-        };
-      }
-
-      return {
-        data: { lrcData: lrcLines, yrcData: ttmlLines },
-        meta: { usingTTMLLyric: ttmlLines.length > 0, usingQRCLyric: false },
-      };
-    } catch (error) {
-      console.error("读取本地歌词失败:", error);
-      return defaultResult;
-    }
+    // web 环境无法读取本地歌词目录，暂不支持本地歌词覆盖
+    return defaultResult;
   }
 
   /**
@@ -730,12 +613,6 @@ class LyricManager {
     if (this.isLyricDataEqual(musicStore.songLyric, lyricData)) {
       // 仅更新加载状态，不更新歌词数据
       statusStore.lyricLoading = false;
-      // 单曲循环时，歌词数据未变，需通知桌面歌词取消加载状态
-      if (isElectron) {
-        window.electron.ipcRenderer.send("desktop-lyric:update-data", {
-          lyricLoading: false,
-        });
-      }
       return;
     }
     // 设置歌词
@@ -889,26 +766,6 @@ class LyricManager {
     } catch (e) {
       console.warn(`Lyrics prefetch failed: [${song.id}]`, e);
     }
-  }
-
-  /**
-   * 获取原始 TTML 文本（如果存在）
-   * @param id 歌曲 ID
-   */
-  public async getRawTtml(id: number | string): Promise<string | null> {
-    if (typeof id !== "number") return null;
-    const ttml = await this.getRawLyricCache(id, "ttml");
-    if (ttml) return cleanTTMLTranslations(ttml);
-    return null;
-  }
-
-  /**
-   * 为任务栏歌词处理 TTML（注入 BG）
-   * @param lines 原始解析后的歌词行
-   * @param ttml 原始 TTML 文本
-   */
-  public processTtmlForTaskbar(lines: LyricLine[], ttml: string): LyricLine[] {
-    return attachTtmlBgLines(ttml, cloneDeep(lines));
   }
 }
 

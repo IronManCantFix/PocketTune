@@ -4,68 +4,56 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-SPlayer is a desktop music player built with **Electron + Vue 3 + TypeScript**. It uses Naive UI for components, Pinia for state management, and integrates with NetEase Cloud Music API, Last.fm, and Subsonic/Navidrome streaming services. Native Rust modules provide OS-level features (taskbar lyrics on Windows, MPRIS on Linux, SMTC on Windows, Discord RPC).
+SPlayer is a web music player built with **Vue 3 + TypeScript**, deployable via Docker or run in local development. It uses Naive UI for components, Pinia for state management, and integrates with NetEase Cloud Music API (via a self-hosted Fastify server), UnblockNeteaseMusic (song unblocking), Last.fm, and Subsonic/Navidrome streaming services. The Electron desktop variant has been removed.
 
 ## Commands
 
 ```bash
-pnpm dev                # Start dev environment (builds native modules + launches Electron)
-pnpm build              # Full production build (typecheck + electron-vite build)
-pnpm build:win          # Package for Windows
-pnpm build:mac          # Package for macOS
-pnpm build:linux        # Package for Linux
-pnpm lint               # ESLint (--max-warnings=0, zero tolerance)
-pnpm format             # Prettier
-pnpm typecheck          # Full TypeScript check (node + web)
-pnpm typecheck:node     # Main process + preload TypeScript check
-pnpm typecheck:web      # Renderer process TypeScript check
+pnpm api             # Start self-hosted API server (tsx server/index.ts, port 3000 by default)
+pnpm dev             # Start Vite dev server (proxy /api -> 127.0.0.1:3000)
+pnpm build           # Full production build (typecheck + vite build)
+pnpm lint            # ESLint (--max-warnings=0, zero tolerance)
+pnpm format          # Prettier
+pnpm typecheck:web   # Renderer TypeScript check (vue-tsc)
+pnpm typecheck:server # Server TypeScript check (tsc)
 ```
 
-Set `SKIP_NATIVE_BUILD=true` to skip Rust native module compilation during dev.
+Set `VITE_DEV_API_PORT` to change the dev proxy target port; `VITE_API_URL` overrides the API base path.
 
 ## Architecture
 
-### Process Model (Electron)
+### Server (`server/`)
 
-- **Main process** (`electron/main/`): Window management, IPC handlers, SQLite database, system tray, global shortcuts, Fastify API server, native module integration
-- **Preload** (`electron/preload/`): Context bridge exposing `window.api.store` and `window.logger` to renderer
-- **Renderer** (`src/`): Vue 3 SPA — the UI
+Self-contained Fastify app shared by local dev (`pnpm api`) and Docker (`npx tsx server/index.ts`):
 
-### IPC Layer
+- `server/netease/` — NetEase Cloud Music API (wraps `@neteasecloudmusicapienhanced/api`), mounted at `/api/netease/*`
+- `server/unblock/` + `server/unm/` — UnblockNeteaseMusic as a library (`@unblockneteasemusic/server`), mounted at `/api/unblock/*`, also post-processes `song_url*`/`song_download_url*` responses (replaces unavailable URLs)
+- `server/qqmusic/` — QQ Music lyric matching (QRC), mounted at `/api/qqmusic/*`
+- Env: `PORT`, `LOG_LEVEL`, `UNM_ENABLED`, `UNBLOCK_SOURCES`, `MIN_BR`, `AMLL_DB_SERVER`
 
-18 IPC modules in `electron/main/ipc/` handle all main↔renderer communication: `ipc-cache`, `ipc-file`, `ipc-lyric`, `ipc-media`, `ipc-mpv`, `ipc-socket`, `ipc-store`, `ipc-taskbar`, `ipc-tray`, `ipc-window`, `ipc-system`, `ipc-shortcut`, `ipc-update`, `ipc-protocol`, `ipc-mac-statusbar`, `ipc-thumbar`, `ipc-renderer-log`.
+### Renderer (`src/`)
 
-### Renderer Architecture (`src/`)
-
-- **Stores** (`stores/`): Pinia with persistedstate — `data` (songs/user), `status` (playback), `setting` (config), `local` (local music), `music`, `streaming`, `shortcut`
-- **Core** (`core/`): `audio-player/` (playback engine), `automix/`, `player/` (state), `resource/` (caching)
+- **Stores** (`stores/`): Pinia with persistedstate — `data` (songs/user), `status` (playback), `setting` (config), `music`, `streaming`
+- **Core** (`core/`): `audio-player/` (web playback engine + ffmpeg worker), `automix/`, `player/` (state), `resource/` (caching/downloads)
 - **API** (`api/`): Axios-based, organized by domain (song, playlist, login, streaming, lastfm)
 - **Composables** (`composables/`): `useInit`, `useSongMenu`, `useQualityControl`, etc.
 - **Components** (`components/`): AMLL (lyrics), Card, Common, Global, Layout, List, Menu, Modal, Player, Search, Setting, UI
 
-### Native Modules (`native/`)
+### Native (WASM only)
 
-Rust-based, built via `scripts/build-native.ts`:
+`native/ferrous-opencc-wasm` — Chinese character conversion (prebuilt WASM pkg, consumed via `@opencc` alias). All Rust desktop modules were removed.
 
-- `taskbar-lyric` — Windows taskbar lyrics display
-- `external-media-integration` — OS media integration
-- `smtc-for-splayer` — Windows System Media Transport Controls
-- `mpris-for-splayer` — Linux MPRIS support
-- `discord-rpc-for-splayer` — Discord Rich Presence
-- `ferrous-opencc-wasm` — Chinese character conversion (WASM)
+### Deployment
 
-### Embedded Server
-
-`electron/server/` runs a Fastify instance (port 25884 default) wrapping NetEase Cloud Music API, proxied via `/api` in dev.
+- **Docker**: nginx serves `dist/` and reverse-proxies `/api/` to the Fastify server; see `Dockerfile`, `nginx.conf`, `docker-compose.yml`
+- **Vercel**: static output `dist/` (`vercel.json`)
 
 ## Path Aliases
 
 ```
-@/       → src/
-@emi/    → native/external-media-integration
-@shared/ → src/types/shared
-@opencc/ → native/ferrous-opencc-wasm/pkg
-@native/ → native/
+@/        → src/
+@shared/  → src/types/shared
+@opencc/  → native/ferrous-opencc-wasm/pkg
 ```
 
 ## Code Conventions
@@ -76,5 +64,5 @@ Rust-based, built via `scripts/build-native.ts`:
 - **Naive UI components**: Auto-resolved via `unplugin-vue-components`
 - **Unused variables**: Prefix with `_` to suppress lint warnings
 - **Prettier**: Double quotes, trailing commas, 2-space indent, 100 char width
-- **Workers**: Heavy computation (audio analysis) runs in worker threads (`electron/main/workers/`)
-- **TypeScript**: Composite project — `tsconfig.node.json` (main/preload/scripts) and `tsconfig.web.json` (renderer)
+- **Workers**: Heavy computation (audio analysis) runs in a web worker (`src/core/audio-player/ffmpeg-engine/ffmpeg.worker.ts`)
+- **TypeScript**: Composite project — `tsconfig.web.json` (renderer, extends @electron-toolkit/tsconfig) and `tsconfig.server.json` (server)

@@ -11,13 +11,12 @@
 <h2> SPlayer </h2>
 <p> 一个简约的音乐播放器 </p>
 
-[API Docs](https://splayer.imsyy.top/api.html) | [开发版](https://github.com/imsyy/SPlayer/actions) | [发行版](https://splayer.imsyy.top/download.html)
+[API Docs](https://splayer.imsyy.top/api.html) | [开发版](https://github.com/imsyy/SPlayer/actions)
 
 <br />
 
 [![Stars](https://img.shields.io/github/stars/imsyy/SPlayer?style=flat)](https://github.com/imsyy/SPlayer/stargazers)
 [![Version](https://img.shields.io/github/v/release/imsyy/SPlayer)](https://github.com/imsyy/SPlayer/releases)
-[![Build Release](https://github.com/imsyy/SPlayer/actions/workflows/release.yml/badge.svg)](https://github.com/imsyy/SPlayer/actions/workflows/release.yml)
 [![License](https://img.shields.io/github/license/imsyy/SPlayer)](https://github.com/imsyy/SPlayer/blob/dev/LICENSE)
 [![Issues](https://img.shields.io/github/issues/imsyy/SPlayer)](https://github.com/imsyy/SPlayer/issues)
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/imsyy/SPlayer)
@@ -40,10 +39,9 @@
 > - 禁止在二开项目中修改程序原版权信息（ 您可以添加二开作者信息 ）
 > - 感谢您的尊重与理解
 
-- 本项目采用 [Vue 3](https://cn.vuejs.org/) + [TypeScript](https://www.typescriptlang.org/) + [Naïve UI](https://www.naiveui.com/) + [Electron](https://www.electronjs.org/zh/docs/latest/) 开发
+- 本项目采用 [Vue 3](https://cn.vuejs.org/) + [TypeScript](https://www.typescriptlang.org/) + [Naïve UI](https://www.naiveui.com/) 开发，本地后端基于 Fastify 提供 API 服务
 - Node.js 版本要求：>= 20，包管理器：pnpm >= 10
-- 默认会构建原生模块，需准备 Rust 工具链；如仅需要网页端构建或暂时跳过，可设置环境变量 `SKIP_NATIVE_BUILD=true`
-- 支持网页端与客户端，由于设备有限，目前仅保证 Windows 系统的适配，其他平台如遇问题可以提 Issue 或自行解决后选择提 PR
+- 支持网页端部署（Docker / Vercel / 静态托管），也可使用 `pnpm api` 在本地运行后端服务
 <!-- - 仅对移动端做了基础适配，**不保证功能全部可用** -->
 
 <!--  > 请注意，本程序不打算开发移动端，也不会对移动端进行完美适配，仅保证基础可用性 -->
@@ -56,14 +54,9 @@
 
 1. 安装依赖：`pnpm install`
 2. 复制 `.env.example` 为 `.env` 并按需修改
-3. 启动开发：`pnpm dev`
-4. 构建：
-   - `pnpm build`
-   - `pnpm build:win`
-
-### 跳过原生模块构建
-
-默认会编译 `native/*` 下的原生模块（需要 Rust）。如果你的场景不需要原生能力，可设置 `SKIP_NATIVE_BUILD=true` 后再执行 `pnpm dev` / `pnpm build`。
+3. 启动本地后端：`pnpm api`
+4. 启动前端开发服务器：`pnpm dev`
+5. 构建：`pnpm build`（产物输出至 `dist/` 目录）
 
 ## 👀 Demo
 
@@ -76,12 +69,9 @@
 - ✨ 支持扫码登录
 - 📱 支持手机号登录
 - ~~📅 自动进行每日签到及云贝签到~~
-- 💻 支持桌面歌词
-- 💻 支持切换为本地播放器，此模式将不会连接网络
 - 🎨 封面主题色自适应，支持全站着色
 - 🌚 Light / Dark / Auto 模式自动切换
-- 📁 本地歌曲管理及分类（建议先使用 [音乐标签](https://www.cnblogs.com/vinlxc/p/11347744.html) 进行匹配后再使用）
-- 📁 本地音乐标签编辑及封面修改
+- 📁 本地歌单（浏览器本地数据，离线可用）
 - ➕ 新建歌单及歌单编辑
 - ❤️ 收藏 / 取消收藏歌单或歌手
 - ☁️ 云盘音乐上传
@@ -138,28 +128,7 @@
 
 </details>
 
-<details>
-<summary> 本地音乐 </summary>
-
-![发现页面](/screenshots/SPlayer%20-%20本地音乐.jpg)
-
-</details>
-
 ## 📦️ 获取
-
-### 二进制安装方案
-
-#### 稳定版
-
-通常情况下，可以在 [Releases](https://github.com/imsyy/SPlayer/releases) 中获取稳定版
-
-也可前往 [SPlayer 官网](https://splayer.imsyy.top/) 获取稳定版
-
-#### 开发版
-
-可以通过 GitHub Actions 工作流获取最新的开发版
-
-[Dev Workflow](https://github.com/imsyy/SPlayer/actions/workflows/dev.yml)
 
 ### 自行部署方案
 
@@ -210,7 +179,7 @@ docker run -d --name SPlayer -p 25884:25884 imsyy/splayer:latest
    VITE_API_URL = "https://example.com";
    ```
 
-5. 将 `Build and Output Settings` 中的 `Output Directory` 改为 `out/renderer`
+5. 将 `Build and Output Settings` 中的 `Output Directory` 改为 `dist`（仓库已通过 `vercel.json` 配置，通常无需手动修改）
 
    ![build](/screenshots/build.jpg)
 
@@ -237,7 +206,7 @@ docker run -d --name SPlayer -p 25884:25884 imsyy/splayer:latest
    pnpm build
    ```
 
-5. 将站点运行目录设置为 `out/renderer` 目录
+5. 将站点运行目录设置为 `dist` 目录（后端 API 服务需另行部署，可参考上方 Docker 部署方案）
 
 #### ⚙️ 本地部署
 
@@ -252,16 +221,14 @@ docker run -d --name SPlayer -p 25884:25884 imsyy/splayer:latest
 
 3. 克隆仓库并拉取至本地，此处不再赘述
 4. 使用 `pnpm install` 安装项目依赖（若安装过程中遇到网络错误，请使用国内镜像源替代，此处不再赘述）
-5. 复制 `.env.example` 文件并重命名为 `.env` 并修改配置（如需跳过原生模块构建，可设置 `SKIP_NATIVE_BUILD=true`）
-6. 打包客户端，请依据你的系统类型来选择，打包成功后，会输出安装包或可执行文件在 `/dist` 目录中，可自行安装
+5. 复制 `.env.example` 文件并重命名为 `.env` 并修改配置
+6. 构建网页端
 
-   > 默认情况下，构建命令仅会构建当前系统架构的版本。如需构建特定架构（如 x64 + arm64），请在命令后追加参数，例如：`pnpm build:win -- --x64 --arm64`
+   ```bash
+   pnpm build
+   ```
 
-   | 命令               | 系统类型 |
-   | ------------------ | -------- |
-   | `pnpm build:win`   | Windows  |
-   | `pnpm build:linux` | Linux    |
-   | `pnpm build:mac`   | macOS    |
+   构建完成后，静态产物将输出至 `dist` 目录，可将其部署至任意静态服务器；后端 API 服务可使用 `pnpm api` 启动，或参考上方 Docker 部署方案
 
 ## 😘 鸣谢
 

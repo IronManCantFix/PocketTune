@@ -136,14 +136,18 @@ watch(
     padding: 0 16px;
     border-radius: 12px;
     background-color: rgba(var(--primary), 0.08);
+    min-width: 0;
     .cover-img {
       width: 60px;
       height: 60px;
       border-radius: 12px;
       margin-right: 4px;
+      flex-shrink: 0;
     }
     .song-info {
       overflow: hidden;
+      flex: 1;
+      min-width: 0;
     }
     .title {
       font-size: 20px;
@@ -156,6 +160,7 @@ watch(
       margin-left: auto;
       display: flex;
       gap: 12px;
+      flex-shrink: 0;
       .close {
         width: 40px;
         height: 40px;

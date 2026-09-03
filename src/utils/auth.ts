@@ -18,7 +18,6 @@ import { logout, refreshLogin } from "@/api/login";
 import { debounce, isFunction, type DebouncedFunc } from "lodash-es";
 import { isBeforeSixAM } from "./time";
 import { dailyRecommend } from "@/api/rec";
-import { isElectron } from "./env";
 import { likePlaylist, playlistTracks } from "@/api/playlist";
 import { likeArtist } from "@/api/artist";
 import { likeAlbum } from "@/api/album";
@@ -362,8 +361,6 @@ export const toLikeSong: DebouncedFunc<(song: SongType, like: boolean) => Promis
       }
       // 更新
       dataStore.setUserLikeData("songs", likeList);
-      // ipc
-      if (isElectron) window.electron.ipcRenderer.send("like-status-change", like);
     } catch (error) {
       window.$message.error(`${like ? "喜欢" : "取消"}音乐时发生错误`);
       console.error("❌ 更新喜欢歌曲时失败:", error);

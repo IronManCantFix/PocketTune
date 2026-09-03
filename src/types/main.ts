@@ -45,7 +45,17 @@ export enum QualityType {
 }
 
 /** 音频源类型 */
-export type AudioSourceType = "official" | "netease" | "kuwo" | "bodian" | "local" | "streaming";
+export type AudioSourceType =
+  | "official"
+  | "netease"
+  | "kuwo"
+  | "bodian"
+  | "local"
+  | "streaming"
+  | "kugou"
+  | "migu"
+  | "bilibili"
+  | "pyncmd";
 
 export type UserType = {
   id: number;
@@ -344,26 +354,6 @@ export type UpdateLogType = {
   prerelease: boolean;
   force?: boolean;
 };
-
-// 文件信息
-export interface FileInfoType {
-  url: string;
-  sha512: string;
-  size: number;
-}
-
-// 更新信息
-export interface UpdateInfoType {
-  tag: string;
-  version: string;
-  files: FileInfoType[];
-  path: string;
-  sha512: string;
-  releaseDate: string;
-  releaseName: string;
-  releaseNotes: string;
-  prerelease: boolean;
-}
 
 // 登录方式
 export type LoginType = "qr" | "phone" | "cookie" | "uid";

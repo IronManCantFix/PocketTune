@@ -1,51 +1,23 @@
 import { AudioScheduler } from "./AudioScheduler";
 import { getSharedAudioContext } from "./SharedAudioContext";
 import { useAudioManager } from "../player/AudioManager";
-import { useSongManager } from "../player/SongManager";
 import { usePlayerController } from "../player/PlayerController";
-import { useDataStore, useMusicStore, useSettingStore, useStatusStore } from "@/stores";
-import type {
-  AudioAnalysis,
-  AutomixPlan,
-  AutomixState,
-  TransitionProposal,
-  AdvancedTransition,
-} from "@/types/audio/automix";
-import { isAudioAnalysis, isTransitionProposal, isAdvancedTransition } from "@/utils/automix";
+import { useDataStore, useSettingStore, useStatusStore } from "@/stores";
+import type { AudioAnalysis, AutomixPlan, AutomixState } from "@/types/audio/automix";
 import type { SongType } from "@/types/main";
-import { isElectron } from "@/utils/env";
 import { msToTime } from "@/utils/time";
-import { toFileUrl } from "@/utils/fileUrl";
 
 /**
  * 自动混音（Automix）管理器
  * 职责：独立负责自动混音的预分析、智能调度、BPM对齐与无缝切歌逻辑
  */
 export class AutomixManager {
-  /** 下一首歌的完整音频特征分析数据 */
+  /** 下一首歌的完整音频特征分析数据（web 环境暂无分析来源，恒为 null） */
   public nextAnalysis: AudioAnalysis | null = null;
-  /** 下一首歌分析所使用的离线本地路径或 URL Key */
+  /** 下一首歌分析所使用的 Key */
   public nextAnalysisKey: string | null = null;
-  /** 下一首歌的歌曲 ID，用于关联缓存 */
-  public nextAnalysisSongId: number | null = null;
   /** 下一首歌分析的深度："none"(未分析) | "head"(仅头部分析) | "full"(完整分析) */
   public nextAnalysisKind: "none" | "head" | "full" = "none";
-  /** 下一首歌分析的 Promise 状态锁，防止重复发起调用 */
-  public nextAnalysisInFlight: Promise<void> | null = null;
-
-  /** 下一个过渡协议（包含退出时间、切入时间、持续时间等）的缓存 Key */
-  public nextTransitionKey: string | null = null;
-  /** 过渡协议分析的 Promise 状态锁 */
-  public nextTransitionInFlight: Promise<void> | null = null;
-  /** 下一个简单淡入淡出的过渡提案 */
-  public nextTransitionProposal: TransitionProposal | null = null;
-  /** 下一个复杂的 BPM 节拍对齐/高级混音过渡提案 */
-  public nextAdvancedTransition: AdvancedTransition | null = null;
-
-  /** 当前准备执行的 Automix 分析任务的唯一签别 Key，用于阻断重复任务 */
-  public ensureAutomixAnalysisKey: string | null = null;
-  /** 保证当前分析任务执行状态的 Promise 锁 */
-  public ensureAutomixAnalysisInFlight: Promise<void> | null = null;
 
   /** 当前由于 Automix 引发的音量增益（通常在自动混音过程中会动态下降或拉升） */
   public automixGain = 1.0;
@@ -71,12 +43,7 @@ export class AutomixManager {
   public resetNextAnalysisCache() {
     this.nextAnalysis = null;
     this.nextAnalysisKey = null;
-    this.nextAnalysisSongId = null;
-    this.nextAnalysisInFlight = null;
     this.nextAnalysisKind = "none";
-    this.nextTransitionKey = null;
-    this.nextTransitionInFlight = null;
-    this.nextTransitionProposal = null;
     this.automixLogTimestamps.clear();
     this.automixGain = 1.0;
   }
@@ -89,33 +56,6 @@ export class AutomixManager {
   private formatAutomixTime(seconds: number): string {
     if (!Number.isFinite(seconds)) return "--:--";
     return msToTime(Math.max(0, Math.round(seconds * 1000)));
-  }
-
-  /**
-   * 将系统本地 `file://` 协议的安全音轨链接解码为底层操作系统可直接访问的绝对路径
-   * 这是为了传递给本地 Electron 后端使用 Python 库读取特征所需的实际路径
-   * @param url 可以是 file://... 也可以是转义过的 path
-   * @returns 真实物理路径或者 null
-   */
-  public fileUrlToPath(url: string): string | null {
-    if (!url.startsWith("file://")) return null;
-    const raw = url.slice("file://".length);
-    const normalized = raw.startsWith("/") && /^[A-Za-z]:/.test(raw.slice(1)) ? raw.slice(1) : raw;
-    try {
-      return decodeURIComponent(normalized);
-    } catch {
-      return normalized;
-    }
-  }
-
-  /**
-   * 获取自动分析时的最大时间限制
-   * 从用户设置库中直接读取，最小 10 秒，最大 300 秒（降低内存和 CPU 开销）
-   */
-  public getAutomixAnalyzeTimeSec(): number {
-    const settingStore = useSettingStore();
-    const raw = settingStore.automixMaxAnalyzeTime || 60;
-    return Math.max(10, Math.min(300, raw));
   }
 
   /**
@@ -142,51 +82,25 @@ export class AutomixManager {
   }
 
   /**
-   * 提取当前对象的实质性可用 ID 来进行缓存校验
-   * 如果是电台流，由于 `id` 是动态的，必须退回到真实的 `dj.id` 以避免误判
-   * @param song 要获取的歌曲源对象
-   */
-  public getSongIdForCache(song: SongType): number | null {
-    if (song.type === "radio") return song.dj?.id ?? null;
-    return song.id || null;
-  }
-
-  /**
    * 确保为 Automix 缓存并准备音频源
+   * web 环境暂无本地音乐缓存，直接返回原音频源
    * @param song 歌曲对象
    * @param audioSourceUrl 音频源 URL
    * @param quality 音频质量
    * @returns 缓存后的音频源 URL
    */
   public async ensureAutomixAudioSource(
-    song: SongType,
+    _song: SongType,
     audioSourceUrl: string,
-    quality?: string,
+    _quality?: string,
   ): Promise<string> {
-    const settingStore = useSettingStore();
-    if (
-      !isElectron ||
-      !settingStore.enableAutomix ||
-      settingStore.playbackEngine !== "web-audio" ||
-      !audioSourceUrl.startsWith("http")
-    ) {
-      return audioSourceUrl;
-    }
-
-    const songId = this.getSongIdForCache(song);
-    if (songId !== null) {
-      const songManager = useSongManager();
-      const cachedPath = await songManager.ensureMusicCachePath(songId, audioSourceUrl, quality);
-      if (cachedPath) {
-        return toFileUrl(cachedPath);
-      }
-    }
+    // web 环境暂不支持本地音乐缓存
     return audioSourceUrl;
   }
 
   /**
    * 获取并执行当前音频源的 Automix 特征分析
-   * 如果成功返回该 AudioAnalysis，否则返回 null
+   * web 环境暂无离线特征分析能力，返回空结果，Automix 将降级为基于时长的淡入淡出
    * @param analysisKey 音频源的分析 Key（通常是歌曲的本地文件路径）
    * @param analysisMode 分析模式：
    *   - "none": 不执行分析
@@ -195,32 +109,10 @@ export class AutomixManager {
    * @returns 包含分析结果和实际分析模式的对象
    */
   public async fetchAudioAnalysis(
-    analysisKey: string | null,
-    analysisMode: "none" | "head" | "full",
+    _analysisKey: string | null,
+    _analysisMode: "none" | "head" | "full",
   ): Promise<{ analysis: AudioAnalysis | null; analysisKind: "none" | "head" | "full" }> {
-    const settingStore = useSettingStore();
-    if (
-      analysisMode === "none" ||
-      !isElectron ||
-      !settingStore.enableAutomix ||
-      settingStore.playbackEngine !== "web-audio" ||
-      !analysisKey
-    ) {
-      return { analysis: null, analysisKind: "none" };
-    }
-    try {
-      const channel = analysisMode === "head" ? "analyze-audio-head" : "analyze-audio";
-      const raw = await window.electron.ipcRenderer.invoke(channel, analysisKey, {
-        maxAnalyzeTimeSec: this.getAutomixAnalyzeTimeSec(),
-      });
-      if (isAudioAnalysis(raw)) {
-        return { analysis: raw, analysisKind: analysisMode };
-      }
-    } catch (e: unknown) {
-      if (e instanceof Error && e.message === "EXPIRED") throw e;
-      console.warn("[Automix] 分析失败:", e);
-      return { analysis: null, analysisKind: "none" };
-    }
+    // web 环境暂无离线特征分析能力
     return { analysis: null, analysisKind: "none" };
   }
 
@@ -268,122 +160,10 @@ export class AutomixManager {
 
   /**
    * 确保（并提前发起）下一首歌乃至当前歌曲未完备的底层音频离线特征分析
+   * web 环境暂无离线特征分析能力，此方法为空操作
    */
   public ensureAutomixAnalysisReady(): void {
-    if (!isElectron) return;
-    if (this.ensureAutomixAnalysisInFlight) return;
-
-    const settingStore = useSettingStore();
-    if (!settingStore.enableAutomix || settingStore.playbackEngine !== "web-audio") return;
-
-    const musicStore = useMusicStore();
-    const currentSong = musicStore.playSong;
-    if (!currentSong) return;
-
-    const playerController = usePlayerController();
-    const nextInfo = this.getNextSongForAutomix();
-    if (!nextInfo) return;
-
-    const currentId = this.getSongIdForCache(currentSong);
-    const nextId = this.getSongIdForCache(nextInfo.song);
-    const key = `${playerController.currentRequestToken}:${currentId ?? "x"}:${nextId ?? "x"}`;
-
-    if (this.ensureAutomixAnalysisKey === key) {
-      if (
-        playerController.currentAnalysis &&
-        playerController.currentAnalysisKind === "full" &&
-        this.nextAnalysis
-      )
-        return;
-    }
-
-    this.ensureAutomixAnalysisKey = key;
-    const token = playerController.currentRequestToken;
-    const analyzeTime = this.getAutomixAnalyzeTimeSec();
-
-    this.ensureAutomixAnalysisInFlight = (async () => {
-      const songManager = useSongManager();
-
-      let currentPath =
-        playerController.currentAnalysisKey ||
-        currentSong.path ||
-        (playerController.currentAudioSource
-          ? this.fileUrlToPath(playerController.currentAudioSource.url)
-          : null);
-
-      if (!currentPath && currentId !== null) {
-        const quality = playerController.currentAudioSource?.quality;
-        const url = playerController.currentAudioSource?.url;
-        if (url && url.startsWith("http")) {
-          currentPath = await songManager.ensureMusicCachePath(currentId, url, quality);
-        } else {
-          currentPath = await songManager.getMusicCachePath(currentId, quality);
-        }
-      }
-
-      if (token !== playerController.currentRequestToken) return;
-
-      if (currentPath) {
-        playerController.currentAnalysisKey = currentPath;
-        if (!playerController.currentAnalysis || playerController.currentAnalysisKind !== "full") {
-          const raw = await window.electron.ipcRenderer.invoke("analyze-audio", currentPath, {
-            maxAnalyzeTimeSec: analyzeTime,
-          });
-          if (token !== playerController.currentRequestToken) return;
-          if (isAudioAnalysis(raw)) {
-            playerController.currentAnalysis = raw;
-            playerController.currentAnalysisKind = "full";
-          }
-        }
-      }
-
-      let nextPath = nextInfo.song.path || null;
-      if (!nextPath && nextId !== null) {
-        const cached = await songManager.getMusicCachePath(nextId);
-        if (cached) {
-          nextPath = cached;
-        } else {
-          const prefetch = songManager.peekPrefetch(nextId);
-          if (!prefetch && settingStore.useNextPrefetch) {
-            await songManager.prefetchNextSong();
-          }
-          const updatedPrefetch = songManager.peekPrefetch(nextId);
-          const url = updatedPrefetch?.url;
-          const quality = updatedPrefetch?.quality;
-          if (url && url.startsWith("file://")) {
-            nextPath = this.fileUrlToPath(url);
-          } else if (url && url.startsWith("http")) {
-            nextPath = await songManager.ensureMusicCachePath(nextId, url, quality);
-          }
-        }
-      }
-
-      if (token !== playerController.currentRequestToken) return;
-
-      if (nextPath) {
-        if (this.nextAnalysisKey !== nextPath) {
-          this.nextAnalysisKey = nextPath;
-          this.nextAnalysisSongId = nextId;
-          this.nextAnalysis = null;
-          this.nextAnalysisKind = "none";
-          this.nextAnalysisInFlight = null;
-        }
-        if (!this.nextAnalysis) {
-          const raw = await window.electron.ipcRenderer.invoke("analyze-audio-head", nextPath, {
-            maxAnalyzeTimeSec: analyzeTime,
-          });
-          if (token !== playerController.currentRequestToken) return;
-          if (this.nextAnalysisKey === nextPath && isAudioAnalysis(raw)) {
-            this.nextAnalysis = raw;
-            this.nextAnalysisKind = "head";
-          }
-        }
-      }
-    })().finally(() => {
-      if (this.ensureAutomixAnalysisKey === key) {
-        this.ensureAutomixAnalysisInFlight = null;
-      }
-    });
+    // web 环境暂无离线特征分析能力，跳过预分析
   }
 
   /**
@@ -429,7 +209,6 @@ export class AutomixManager {
 
     if (
       !settingStore.enableAutomix ||
-      audioManager.engineType === "mpv" ||
       audioManager.paused ||
       playerController.isTransitioning ||
       statusStore.personalFmMode
@@ -591,14 +370,12 @@ export class AutomixManager {
     const playerController = usePlayerController();
     const statusStore = useStatusStore();
     const settingStore = useSettingStore();
-    const audioManager = useAudioManager();
 
     if (
       playerController.isTransitioning ||
       !statusStore.playStatus ||
       !settingStore.enableAutomix ||
-      statusStore.personalFmMode ||
-      audioManager.engineType === "mpv"
+      statusStore.personalFmMode
     ) {
       this.resetAutomixScheduling("IDLE");
       return;
@@ -633,93 +410,11 @@ export class AutomixManager {
 
   /**
    * 提前预取并分析下一首将被播放的音频特征和可选的模型生成的长段混音预案
-   * 会调用底层的 IPC 进行轻量级的头部分析（Analyze Head）
+   * web 环境暂无离线特征分析能力，此方法为空操作
    * @param nextSong 即将被播放的候选歌曲
    */
-  public prefetchAutomixNextData(nextSong: SongType) {
-    const playerController = usePlayerController();
-    const settingStore = useSettingStore();
-    const musicStore = useMusicStore();
-    if (!isElectron || !settingStore.enableAutomix) return;
-
-    const nextSongId = this.getSongIdForCache(nextSong);
-    const nextKey =
-      nextSong.path ||
-      (nextSongId !== null && this.nextAnalysisSongId === nextSongId ? this.nextAnalysisKey : null);
-    if (!nextKey) return;
-    if (this.nextAnalysisKey !== nextKey) {
-      this.nextAnalysisKey = nextKey;
-      this.nextAnalysisSongId = nextSongId;
-      this.nextAnalysis = null;
-      this.nextAnalysisInFlight = null;
-    }
-
-    if (!this.nextAnalysis && !this.nextAnalysisInFlight) {
-      this.nextAnalysisInFlight = window.electron.ipcRenderer
-        .invoke("analyze-audio-head", nextKey, {
-          maxAnalyzeTimeSec: this.getAutomixAnalyzeTimeSec(),
-        })
-        .then((raw) => {
-          if (this.nextAnalysisKey !== nextKey) return;
-          if (isAudioAnalysis(raw)) {
-            this.nextAnalysis = raw;
-          }
-        })
-        .catch((e) => {
-          if (this.nextAnalysisKey !== nextKey) return;
-          console.warn("[Automix] 下一首分析失败:", e);
-        })
-        .finally(() => {
-          if (this.nextAnalysisKey === nextKey) {
-            this.nextAnalysisInFlight = null;
-          }
-        });
-    }
-
-    const currentPath =
-      playerController.currentAnalysisKey ||
-      musicStore.playSong?.path ||
-      (playerController.currentAudioSource
-        ? this.fileUrlToPath(playerController.currentAudioSource.url)
-        : null);
-    if (!currentPath) return;
-
-    const transitionKey = `${currentPath}>>${nextKey}`;
-    if (this.nextTransitionKey !== transitionKey) {
-      this.nextTransitionKey = transitionKey;
-      this.nextTransitionProposal = null;
-      this.nextAdvancedTransition = null;
-      this.nextTransitionInFlight = null;
-    }
-
-    if (
-      !this.nextTransitionProposal &&
-      !this.nextAdvancedTransition &&
-      !this.nextTransitionInFlight
-    ) {
-      this.nextTransitionInFlight = Promise.all([
-        window.electron.ipcRenderer.invoke("suggest-transition", currentPath, nextKey),
-        window.electron.ipcRenderer.invoke("suggest-long-mix", currentPath, nextKey),
-      ])
-        .then(([raw, rawLong]) => {
-          if (this.nextTransitionKey !== transitionKey) return;
-          if (isTransitionProposal(raw)) {
-            this.nextTransitionProposal = raw;
-          }
-          if (isAdvancedTransition(rawLong)) {
-            this.nextAdvancedTransition = rawLong;
-          }
-        })
-        .catch((e) => {
-          if (this.nextTransitionKey !== transitionKey) return;
-          console.warn("[Automix] 原生过渡建议失败:", e);
-        })
-        .finally(() => {
-          if (this.nextTransitionKey === transitionKey) {
-            this.nextTransitionInFlight = null;
-          }
-        });
-    }
+  public prefetchAutomixNextData(_nextSong: SongType) {
+    // web 环境暂无离线特征分析与过渡建议能力，跳过预取
   }
 
   /**
@@ -774,78 +469,33 @@ export class AutomixManager {
     let triggerTime = exitPoint - 8.0;
     let crossfadeDuration = 8.0;
     let startSeek = 0;
-    let mixType: "default" | "bassSwap" = "default";
-    let initialRate = 1.0;
+    const mixType: "default" | "bassSwap" = "default";
+    const initialRate = 1.0;
     let uiSwitchDelay = 0;
 
-    const musicStore = useMusicStore();
-    const nextSongId = this.getSongIdForCache(nextInfo.song);
-    const currentPath = playerController.currentAnalysisKey || musicStore.playSong?.path;
-    const nextPath =
-      nextInfo.song.path ||
-      (nextSongId !== null && this.nextAnalysisSongId === nextSongId ? this.nextAnalysisKey : null);
-    const transitionKey = currentPath && nextPath ? `${currentPath}>>${nextPath}` : null;
+    // 存在双端分析数据时按 BPM 对齐淡入淡出参数
+    if (currentAnalysis && nextAnalysis) {
+      crossfadeDuration = 8.0;
+      let rawTrigger = exitPoint - crossfadeDuration;
 
-    const advancedTransition =
-      transitionKey && this.nextTransitionKey === transitionKey
-        ? this.nextAdvancedTransition
-        : null;
-    const transition =
-      transitionKey && this.nextTransitionKey === transitionKey
-        ? this.nextTransitionProposal
-        : null;
+      if (currentAnalysis.bpm && currentAnalysis.first_beat_pos !== undefined) {
+        rawTrigger = this.snapToBeat(
+          rawTrigger,
+          currentAnalysis.bpm,
+          currentAnalysis.first_beat_pos,
+          true,
+        );
+      }
 
-    if (advancedTransition) {
-      triggerTime = advancedTransition.start_time_current;
-      crossfadeDuration = advancedTransition.duration;
-      startSeek = advancedTransition.start_time_next * 1000;
-      mixType = advancedTransition.strategy.includes("Bass Swap") ? "bassSwap" : "default";
-      initialRate = advancedTransition.playback_rate;
-      uiSwitchDelay = crossfadeDuration * 0.5;
+      triggerTime = rawTrigger;
+      startSeek = (nextAnalysis.fade_in_pos || 0) * 1000;
 
-      return this.createAutomixPlan(
-        nextInfo,
-        triggerTime,
-        crossfadeDuration,
-        startSeek,
-        initialRate,
-        uiSwitchDelay,
-        mixType,
-      );
-    }
-
-    if (transition && transition.duration > 0.5) {
-      const safeTrigger = Math.min(transition.current_track_mix_out, duration - 1.0);
-      const safeDuration = Math.min(transition.duration, duration - safeTrigger);
-
-      triggerTime = safeTrigger;
-      crossfadeDuration = safeDuration;
-      startSeek = transition.next_track_mix_in * 1000;
-      mixType = transition.filter_strategy.includes("Bass Swap") ? "bassSwap" : "default";
-    } else {
-      if (currentAnalysis && nextAnalysis) {
-        crossfadeDuration = 8.0;
-        let rawTrigger = exitPoint - crossfadeDuration;
-
-        if (currentAnalysis.bpm && currentAnalysis.first_beat_pos !== undefined) {
-          rawTrigger = this.snapToBeat(
-            rawTrigger,
-            currentAnalysis.bpm,
-            currentAnalysis.first_beat_pos,
-            true,
-          );
-        }
-
-        triggerTime = rawTrigger;
-        startSeek = (nextAnalysis.fade_in_pos || 0) * 1000;
-
-        if (duration - triggerTime < 4.0) {
-          triggerTime = exitPoint - crossfadeDuration;
-        }
+      if (duration - triggerTime < 4.0) {
+        triggerTime = exitPoint - crossfadeDuration;
       }
     }
 
-    if (!advancedTransition && canTrustExitPoint && currentAnalysis.vocal_out_pos) {
+    if (canTrustExitPoint && currentAnalysis.vocal_out_pos) {
       const plan = this.applyAggressiveOutro(
         currentAnalysis,
         triggerTime,
@@ -987,7 +637,7 @@ export class AutomixManager {
         analysis: "none",
       });
 
-      const analysisKey = targetSong.path || this.fileUrlToPath(audioSource.url);
+      const analysisKey = targetSong.path || null;
       const analysis =
         analysisKey && this.nextAnalysisKey === analysisKey && this.nextAnalysis
           ? this.nextAnalysis

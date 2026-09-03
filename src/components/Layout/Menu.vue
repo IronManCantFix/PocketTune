@@ -29,7 +29,6 @@ import {
 } from "@/stores";
 import type { CoverType } from "@/types/main";
 import { isLogin } from "@/utils/auth";
-import { isElectron } from "@/utils/env";
 import { renderIcon } from "@/utils/helper";
 import { openCreatePlaylist } from "@/utils/modal";
 import { debounce } from "lodash-es";
@@ -181,7 +180,7 @@ const menuOptions = computed<MenuOption[] | MenuGroupOption[]>(() => {
               },
               () => "下载管理",
             ),
-          show: statusStore.isDeveloperMode && isElectron && !settingStore.sidebarHide.hideDownload,
+          show: statusStore.isDeveloperMode && !settingStore.sidebarHide.hideDownload,
           icon: renderIcon("Download"),
         },
         {
@@ -190,13 +189,6 @@ const menuOptions = computed<MenuOption[] | MenuGroupOption[]>(() => {
           label: "流媒体",
           show: settingStore.streamingEnabled,
           icon: renderIcon("Stream"),
-        },
-        {
-          key: "local",
-          link: "local",
-          label: "本地歌曲",
-          show: isElectron && !settingStore.sidebarHide.hideLocal,
-          icon: renderIcon("FolderMusic"),
         },
         {
           key: "history",
@@ -273,31 +265,6 @@ const menuOptions = computed<MenuOption[] | MenuGroupOption[]>(() => {
         },
       ]
     : [
-        {
-          key: "local",
-          link: "local",
-          label: "音乐库",
-          show: isElectron,
-          icon: renderIcon("FolderMusic"),
-        },
-        {
-          key: "local-albums",
-          link: "local-albums",
-          label: "专辑",
-          show:
-            isElectron &&
-            (localStore.localSongs?.length > 0 || settingStore.localFilesPath?.length > 0),
-          icon: renderIcon("Album"),
-        },
-        {
-          key: "local-artists",
-          link: "local-artists",
-          label: "艺术家",
-          show:
-            isElectron &&
-            (localStore.localSongs?.length > 0 || settingStore.localFilesPath?.length > 0),
-          icon: renderIcon("Person"),
-        },
         {
           key: "divider",
           type: "divider",

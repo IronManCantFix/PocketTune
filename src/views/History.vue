@@ -103,6 +103,8 @@ const cleanHistory = () => {
   .menu {
     width: 100%;
     margin-bottom: 12px;
+    flex-wrap: wrap;
+    gap: 8px;
     .n-button {
       height: 40px;
       transition: all 0.3s var(--n-bezier);

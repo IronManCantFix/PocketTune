@@ -99,18 +99,6 @@
             :groups="lyricConfig.groups"
             :highlight-key="highlightKey"
           />
-          <!-- 快捷键 -->
-          <UniversalSetting
-            v-else-if="activeKey === 'keyboard'"
-            :groups="keyboardConfig.groups"
-            :highlight-key="highlightKey"
-          />
-          <!-- 本地 -->
-          <UniversalSetting
-            v-else-if="activeKey === 'local'"
-            :groups="localConfig.groups"
-            :highlight-key="highlightKey"
-          />
           <!-- 网络 -->
           <UniversalSetting
             v-else-if="activeKey === 'network'"
@@ -133,7 +121,6 @@ import { SettingItem, SettingGroup } from "@/types/settings";
 import type { SettingType } from "@/types/main";
 import { useMobile } from "@/composables/useMobile";
 import { renderIcon } from "@/utils/helper";
-import { isElectron } from "@/utils/env";
 import { useStatusStore } from "@/stores";
 import { getDisplayVersion, isNightly } from "@/utils/version";
 import packageJson from "@/../package.json";
@@ -141,8 +128,6 @@ import { usePlaySettings } from "./config/play";
 import { useGeneralSettings } from "./config/general";
 import { useAppearanceSettings } from "./config/appearance";
 import { useLyricSettings } from "./config/lyric";
-import { useKeyboardSettings } from "./config/keyboard";
-import { useLocalSettings } from "./config/local";
 import { useNetworkSettings } from "./config/network";
 
 const props = defineProps<{ type: SettingType; scrollTo?: string }>();
@@ -151,8 +136,6 @@ const playConfig = usePlaySettings();
 const generalConfig = useGeneralSettings();
 const appearanceConfig = useAppearanceSettings();
 const lyricConfig = useLyricSettings();
-const keyboardConfig = useKeyboardSettings();
-const localConfig = useLocalSettings();
 const networkConfig = useNetworkSettings();
 
 // 配置映射表
@@ -161,8 +144,6 @@ const configs: Record<string, any> = {
   general: generalConfig,
   appearance: appearanceConfig,
   lyrics: lyricConfig,
-  keyboard: keyboardConfig,
-  local: localConfig,
   network: networkConfig,
 };
 
@@ -173,8 +154,6 @@ const allSettingGroups = computed(() => {
     { key: "appearance", groups: appearanceConfig.groups },
     { key: "play", groups: playConfig.groups },
     { key: "lyrics", groups: lyricConfig.groups },
-    { key: "keyboard", groups: keyboardConfig.groups },
-    { key: "local", groups: localConfig.groups },
     { key: "network", groups: networkConfig.groups },
   ];
 });
@@ -318,18 +297,6 @@ const menuOptions: MenuOption[] = [
     key: "lyrics",
     label: "歌词设置",
     icon: renderIcon("Lyrics"),
-  },
-  {
-    key: "local",
-    label: "本地与缓存",
-    show: isElectron,
-    icon: renderIcon("Storage"),
-  },
-  {
-    key: "keyboard",
-    label: "快捷键设置",
-    show: isElectron,
-    icon: renderIcon("Keyboard"),
   },
   {
     key: "network",

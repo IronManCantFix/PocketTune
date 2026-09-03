@@ -23,18 +23,7 @@
           </n-tag>
         </n-flex>
         <n-flex>
-          <n-button
-            :loading="statusStore.updateCheck"
-            type="primary"
-            strong
-            secondary
-            @click="checkUpdate"
-          >
-            {{ statusStore.updateCheck ? "检查更新中" : "检查更新" }}
-          </n-button>
-          <n-button v-if="isElectron" type="primary" strong secondary @click="handleOpenLog">
-            打开日志
-          </n-button>
+          <n-button type="primary" strong secondary @click="checkUpdate"> 检查更新 </n-button>
         </n-flex>
       </n-card>
       <n-collapse-transition :show="!!updateData">
@@ -214,15 +203,9 @@ import type { UpdateLogType } from "@/types/main";
 import { getUpdateLog, openLink } from "@/utils/helper";
 import { debounce } from "lodash-es";
 import { useStatusStore } from "@/stores";
-import { isElectron } from "@/utils/env";
 import packageJson from "@/../package.json";
 
 const statusStore = useStatusStore();
-
-// 打开日志文件
-const handleOpenLog = () => {
-  window.electron.ipcRenderer.send("open-log-file");
-};
 
 // 开发者模式点击次数
 const developerModeClickCount = ref(0);
@@ -348,12 +331,7 @@ const oldVersion = computed<UpdateLogType[]>(() => {
 // 检查更新
 const checkUpdate = debounce(
   () => {
-    if (!isElectron) {
-      window.open(packageJson.github + "/releases", "_blank");
-      return;
-    }
-    statusStore.updateCheck = true;
-    window.electron.ipcRenderer.send("check-update", true);
+    window.open(packageJson.github + "/releases", "_blank");
   },
   300,
   { leading: true, trailing: false },

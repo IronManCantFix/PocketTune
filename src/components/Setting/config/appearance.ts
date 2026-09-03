@@ -1,5 +1,4 @@
 import { useSettingStore, useStatusStore } from "@/stores";
-import { isElectron } from "@/utils/env";
 import {
   openFontManager,
   openCustomCode,
@@ -12,35 +11,14 @@ import {
   openContextMenuManager,
 } from "@/utils/modal";
 import { SettingConfig } from "@/types/settings";
-import { computed, ref } from "vue";
+import { computed } from "vue";
 import { isLogin } from "@/utils/auth";
 
 export const useAppearanceSettings = (): SettingConfig => {
   const settingStore = useSettingStore();
   const statusStore = useStatusStore();
 
-  // --- Window / Borderless Logic (from general.ts) ---
-  const useBorderless = ref(true);
-
-  const handleBorderlessChange = async (val: boolean) => {
-    if (!isElectron) return;
-    const windowConfig = await window.api.store.get("window");
-    window.api.store.set("window", {
-      ...windowConfig,
-      useBorderless: val,
-    });
-    window.$message.warning("设置已保存，重启软件后生效");
-  };
-
-  const onActivate = async () => {
-    if (isElectron) {
-      const windowConfig = await window.api.store.get("window");
-      useBorderless.value = windowConfig?.useBorderless ?? true;
-    }
-  };
-
   return {
-    onActivate,
     groups: [
       {
         title: "主题与风格",
@@ -72,20 +50,6 @@ export const useAppearanceSettings = (): SettingConfig => {
             description: "更改主题色或自定义图片",
             buttonLabel: "配置",
             action: openThemeConfig,
-          },
-          {
-            key: "useBorderless",
-            label: "无边框窗口模式",
-            type: "switch",
-            show: isElectron,
-            description: "是否开启无边框窗口模式，关闭后将使用系统原生边框（需重启）",
-            value: computed({
-              get: () => useBorderless.value,
-              set: (v) => {
-                useBorderless.value = v;
-                handleBorderlessChange(v);
-              },
-            }),
           },
           {
             key: "fontConfig",
@@ -398,22 +362,6 @@ export const useAppearanceSettings = (): SettingConfig => {
                 }),
               },
             ],
-          },
-          {
-            key: "showSpectrums",
-            label: "音乐频谱",
-            type: "switch",
-            show: isElectron,
-            description: "开启音乐频谱会影响性能或增加内存占用，如遇问题请关闭",
-            value: computed({
-              get: () => settingStore.showSpectrums,
-              set: (v) => (settingStore.showSpectrums = v),
-            }),
-            forceIf: {
-              condition: () => settingStore.playbackEngine === "mpv",
-              forcedValue: false,
-              forcedDescription: "MPV 引擎暂不支持显示音乐频谱",
-            },
           },
         ],
       },

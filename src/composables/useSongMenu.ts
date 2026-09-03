@@ -11,13 +11,7 @@ import { useDownloadManager } from "@/core/resource/DownloadManager";
 import { usePlayerController } from "@/core/player/PlayerController";
 import { renderIcon, copyData, getShareUrl } from "@/utils/helper";
 import { deleteCloudSong, importCloudSong } from "@/api/cloud";
-import {
-  openCloudMatch,
-  openCopySongInfo,
-  openDownloadSong,
-  openPlaylistAdd,
-  openSongInfoEditor,
-} from "@/utils/modal";
+import { openCloudMatch, openCopySongInfo, openDownloadSong, openPlaylistAdd } from "@/utils/modal";
 import { deleteSongs, isLogin } from "@/utils/auth";
 import { songUrl } from "@/api/song";
 import { dailyRecommendDislike } from "@/api/rec";
@@ -33,42 +27,6 @@ export const useSongMenu = () => {
   const player = usePlayerController();
   const downloadManager = useDownloadManager();
   const localStore = useLocalStore();
-
-  // 删除本地歌曲
-  const deleteLocalSong = (song: SongType, emit?: (event: "removeSong", args: any[]) => void) => {
-    if (emit === undefined) return;
-    if (!song.path) return;
-    window.$dialog.warning({
-      title: "确认删除",
-      content: () =>
-        h("div", { style: { marginTop: "20px" } }, [
-          h("div", { style: { marginBottom: "10px", opacity: 0.8, fontSize: "12px" } }, song.path),
-          h("div", null, [
-            `确认从本地磁盘中删除 `,
-            h("strong", null, song.name),
-            `？该操作无法撤销！`,
-          ]),
-        ]),
-      positiveText: "删除",
-      negativeText: "取消",
-      onPositiveClick: async () => {
-        const result = await window.electron.ipcRenderer.invoke("delete-file", song.path);
-        if (result) {
-          emit("removeSong", [song.id]);
-          const currentPlayList = dataStore.playList;
-          const songToRemoveIndex = currentPlayList.findIndex(
-            (playSong) => playSong.id === song.id,
-          );
-          if (songToRemoveIndex !== -1) {
-            player.removeSongIndex(songToRemoveIndex);
-          }
-          window.$message.success(`${song.name} 删除成功`);
-        } else {
-          window.$message.error(`${song.name} 删除失败，请重试`);
-        }
-      },
-    });
-  };
 
   // 删除云盘歌曲
   const deleteCloudSongData = (song: SongType, index: number) => {
@@ -291,22 +249,6 @@ export const useSongMenu = () => {
             },
             icon: renderIcon("Share", { size: 18 }),
           },
-          {
-            key: "line-2",
-            type: "divider",
-            show: settingStore.contextMenuOptions.musicTagEditor && isLocal,
-          },
-          {
-            key: "meta-edit",
-            label: "音乐标签编辑",
-            show: settingStore.contextMenuOptions.musicTagEditor && isLocal,
-            props: {
-              onClick: () => {
-                if (song.path) openSongInfoEditor(song);
-              },
-            },
-            icon: renderIcon("EditNote", { size: 20 }),
-          },
         ],
       },
       {
@@ -354,28 +296,6 @@ export const useSongMenu = () => {
           onClick: () => deleteCloudSongData(song, index),
         },
         icon: renderIcon("Delete"),
-      },
-      {
-        key: "delete-local",
-        label: "从本地磁盘中删除",
-        show:
-          settingStore.contextMenuOptions.deleteFromLocal &&
-          emit !== undefined &&
-          isLocal &&
-          !isCurrent,
-        props: {
-          onClick: () => deleteLocalSong(song, emit),
-        },
-        icon: renderIcon("Delete"),
-      },
-      {
-        key: "open-folder",
-        label: "打开歌曲所在目录",
-        show: settingStore.contextMenuOptions.openFolder && isLocal,
-        props: {
-          onClick: () => window.electron.ipcRenderer.send("open-folder", song.path),
-        },
-        icon: renderIcon("SnippetFolder"),
       },
       {
         key: "cloud-match",

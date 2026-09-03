@@ -3,13 +3,11 @@ import { useDataStore, useMusicStore, useStatusStore } from "@/stores";
 import type { SongType } from "@/types/main";
 import type { RepeatModeType, ShuffleModeType } from "@/types/shared/play-mode";
 import { isLogin } from "@/utils/auth";
-import { isElectron } from "@/utils/env";
 import { formatSongsList } from "@/utils/format";
 import { shuffleArray } from "@/utils/helper";
 import { openUserLogin } from "@/utils/modal";
 import axios from "axios";
 import type { MessageReactive } from "naive-ui";
-import * as playerIpc from "./PlayerIpc";
 
 /**
  * 播放模式管理器
@@ -49,8 +47,6 @@ export class PlayModeManager {
     } else {
       statusStore.toggleRepeat();
     }
-
-    this.syncMediaPlayMode();
 
     const modeText: Record<RepeatModeType, string> = {
       list: "列表循环",
@@ -245,7 +241,6 @@ export class PlayModeManager {
 
     const previousMode = statusStore.shuffleMode;
     statusStore.shuffleMode = nextMode;
-    this.syncMediaPlayMode();
 
     // 将耗时的数据处理扔到 UI 图标更新后再进行，避免打乱庞大列表导致点击延迟
     setTimeout(async () => {
@@ -277,35 +272,6 @@ export class PlayModeManager {
         window.$message.error(errorMsg);
       }
     }, 10);
-  }
-
-  /**
-   * 同步当前的播放模式到媒体控件
-   */
-  public syncMediaPlayMode() {
-    const statusStore = useStatusStore();
-
-    if (isElectron) {
-      const shuffle = statusStore.shuffleMode !== "off";
-      const repeat =
-        statusStore.repeatMode === "list"
-          ? "List"
-          : statusStore.repeatMode === "one"
-            ? "Track"
-            : "None";
-
-      playerIpc.sendMediaPlayMode(shuffle, repeat);
-    }
-  }
-
-  /**
-   * 同步播放模式给托盘
-   */
-  public playModeSyncIpc() {
-    const statusStore = useStatusStore();
-    if (isElectron) {
-      playerIpc.sendPlayMode(statusStore.repeatMode, statusStore.shuffleMode);
-    }
   }
 }
 
