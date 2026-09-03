@@ -212,7 +212,7 @@ onMounted(getAllCloudMusic);
     line-height: normal;
     margin-top: 12px;
     margin-bottom: 20px;
-    height: 40px;
+    min-height: 40px;
     .keyword {
       font-size: 30px;
       font-weight: bold;

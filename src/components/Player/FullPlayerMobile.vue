@@ -1,5 +1,5 @@
 <template>
-  <div class="full-player-mobile" ref="mobileStart">
+  <div class="full-player-mobile">
     <!-- 顶部功能栏 -->
     <div class="top-bar">
       <!-- 收起按钮 -->
@@ -9,11 +9,7 @@
     </div>
 
     <!-- 主内容 -->
-    <div
-      :class="['mobile-content', { swiping: isSwiping }]"
-      :style="{ transform: contentTransform }"
-      @click.stop
-    >
+    <div class="mobile-content" :style="{ transform: contentTransform }" @click.stop>
       <!-- 歌曲信息页 -->
       <div class="page info-page">
         <!-- 封面 -->
@@ -170,7 +166,6 @@
 </template>
 
 <script setup lang="ts">
-import { useSwipe } from "@vueuse/core";
 import { useMusicStore, useStatusStore, useDataStore, useSettingStore } from "@/stores";
 import { usePlayerController } from "@/core/player/PlayerController";
 import { useTimeFormat } from "@/composables/useTimeFormat";
@@ -185,7 +180,6 @@ const dataStore = useDataStore();
 const player = usePlayerController();
 const { timeDisplay, toggleTimeFormat } = useTimeFormat();
 
-const mobileStart = ref<HTMLElement | null>(null);
 const pageIndex = ref(0);
 
 const hasLyric = computed(() => {
@@ -205,47 +199,8 @@ watch(hasLyric, (val) => {
   if (!val) pageIndex.value = 0;
 });
 
-// 滑动偏移量
-const swipeOffset = ref(0);
-
-const { direction, isSwiping, lengthX } = useSwipe(mobileStart, {
-  threshold: 10,
-  onSwipe: () => {
-    if (!hasLyric.value) return;
-    // 为正表示向左滑，为负表示向右滑
-    swipeOffset.value = lengthX.value;
-  },
-  onSwipeEnd: () => {
-    if (!hasLyric.value) {
-      swipeOffset.value = 0;
-      return;
-    }
-    // 超过阈值则切换页面
-    if (direction.value === "left" && lengthX.value > 100) {
-      pageIndex.value = 1;
-    } else if (direction.value === "right" && lengthX.value < -100) {
-      pageIndex.value = 0;
-    }
-    swipeOffset.value = 0;
-  },
-});
-
-// 计算实时的变换位置
-const contentTransform = computed(() => {
-  const baseOffset = pageIndex.value * 50; // 百分比
-  if (!isSwiping.value || !hasLyric.value) {
-    return `translateX(-${baseOffset}%)`;
-  }
-  let pixelOffset = lengthX.value;
-  // 限制滑动范围
-  if (pageIndex.value === 0 && pixelOffset < 0) {
-    pixelOffset = pixelOffset * 0.3;
-  }
-  if (pageIndex.value === 1 && pixelOffset > 0) {
-    pixelOffset = pixelOffset * 0.3;
-  }
-  return `translateX(calc(-${baseOffset}% - ${pixelOffset}px))`;
-});
+// 计算实时的变换位置（仅通过指示器切换页面，禁止左右滑动拖动）
+const contentTransform = computed(() => `translateX(-${pageIndex.value * 50}%)`);
 </script>
 
 <style lang="scss" scoped>
@@ -291,9 +246,6 @@ const contentTransform = computed(() => {
     width: 200%;
     height: 100%;
     transition: transform 0.3s cubic-bezier(0.25, 1, 0.5, 1);
-    &.swiping {
-      transition: none;
-    }
     .page {
       width: 50%;
       height: 100%;

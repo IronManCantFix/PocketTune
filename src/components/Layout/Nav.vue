@@ -128,8 +128,9 @@ const setSelect = (key: string) => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: 70px;
-  padding: 0 1rem;
+  // 高度包含 iPhone 顶部安全区（导航内容避让刘海区域）
+  height: calc(70px + env(safe-area-inset-top, 0px));
+  padding: env(safe-area-inset-top, 0px) 1rem 0;
   background-color: transparent;
   -webkit-app-region: drag;
   .n-button {

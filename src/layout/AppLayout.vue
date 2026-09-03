@@ -226,7 +226,8 @@ onMounted(() => {
     background-color: rgba(var(--background));
   }
   #main-content {
-    top: 70px;
+    // 顶部预留导航高度（含 iPhone 顶部安全区）
+    top: calc(70px + env(safe-area-inset-top, 0px));
     background-color: transparent;
     transition: bottom 0.3s;
     .router-view {
@@ -241,7 +242,8 @@ onMounted(() => {
   }
   &.show-player {
     #main-content {
-      bottom: 80px;
+      // 底部预留播放器高度（含 iPhone 底部安全区）
+      bottom: calc(80px + env(safe-area-inset-bottom, 0px));
     }
   }
   &.show-full-player {
