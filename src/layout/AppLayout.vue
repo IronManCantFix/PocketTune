@@ -226,8 +226,8 @@ onMounted(() => {
     background-color: rgba(var(--background));
   }
   #main-content {
-    // 顶部预留导航高度（含 iPhone 顶部安全区）
-    top: calc(70px + env(safe-area-inset-top, 0px));
+    // 顶部预留导航高度，与导航栏同高，避免顶部出现空隙
+    top: 70px;
     background-color: transparent;
     transition: bottom 0.3s;
     .router-view {

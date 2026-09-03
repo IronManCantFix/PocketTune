@@ -75,7 +75,9 @@
 
 body {
   width: 100vw;
+  // 使用动态视口高度，避免 iOS 地址栏收展导致底部露出白边
   height: 100vh;
+  height: 100dvh;
   overflow: hidden;
 }
 

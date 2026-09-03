@@ -218,12 +218,19 @@ onMounted(getAllCloudMusic);
       font-weight: bold;
       margin-right: 12px;
       line-height: normal;
+      // 标题单行不换行
+      white-space: nowrap;
     }
     .status {
       font-size: 15px;
       font-weight: normal;
       line-height: 30px;
+      // 歌曲数与空间靠右显示
+      margin-left: auto;
+      white-space: nowrap;
       .item {
+        // 状态项单行不换行
+        white-space: nowrap;
         display: flex;
         align-items: center;
         opacity: 0.9;

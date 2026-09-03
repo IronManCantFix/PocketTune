@@ -1,5 +1,5 @@
 <template>
-  <div class="full-player-mobile">
+  <div class="full-player-mobile" ref="mobileStart">
     <!-- 顶部功能栏 -->
     <div class="top-bar">
       <!-- 收起按钮 -->
@@ -9,7 +9,11 @@
     </div>
 
     <!-- 主内容 -->
-    <div class="mobile-content" :style="{ transform: contentTransform }" @click.stop>
+    <div
+      :class="['mobile-content', { swiping: isSwiping }]"
+      :style="{ transform: contentTransform }"
+      @click.stop
+    >
       <!-- 歌曲信息页 -->
       <div class="page info-page">
         <!-- 封面 -->
@@ -166,6 +170,7 @@
 </template>
 
 <script setup lang="ts">
+import { useSwipe } from "@vueuse/core";
 import { useMusicStore, useStatusStore, useDataStore, useSettingStore } from "@/stores";
 import { usePlayerController } from "@/core/player/PlayerController";
 import { useTimeFormat } from "@/composables/useTimeFormat";
@@ -180,6 +185,7 @@ const dataStore = useDataStore();
 const player = usePlayerController();
 const { timeDisplay, toggleTimeFormat } = useTimeFormat();
 
+const mobileStart = ref<HTMLElement | null>(null);
 const pageIndex = ref(0);
 
 const hasLyric = computed(() => {
@@ -199,8 +205,43 @@ watch(hasLyric, (val) => {
   if (!val) pageIndex.value = 0;
 });
 
-// 计算实时的变换位置（仅通过指示器切换页面，禁止左右滑动拖动）
-const contentTransform = computed(() => `translateX(-${pageIndex.value * 50}%)`);
+// 仅响应横向滑动，忽略上下方向的拖动，保证页面固定不上下移动
+const { direction, isSwiping, lengthX, lengthY } = useSwipe(mobileStart, {
+  threshold: 10,
+  onSwipeEnd: () => {
+    if (!hasLyric.value) return;
+    // 超过阈值且横向位移更大时才切换页面，忽略上下方向拖动
+    if (Math.abs(lengthX.value) > Math.abs(lengthY.value)) {
+      if (direction.value === "left" && lengthX.value > 100) {
+        pageIndex.value = 1;
+      } else if (direction.value === "right" && lengthX.value < -100) {
+        pageIndex.value = 0;
+      }
+    }
+  },
+});
+
+// 计算实时的变换位置（仅横向平移，页面固定不上下移动）
+// 向左滑 lengthX 为正，内容随之左移以展示歌词页
+const contentTransform = computed(() => {
+  const baseOffset = pageIndex.value * 50; // 百分比
+  if (!isSwiping.value || !hasLyric.value) {
+    return `translateX(-${baseOffset}%)`;
+  }
+  // 仅横向位移超过纵向时跟随手势，忽略上下方向的拖动
+  if (Math.abs(lengthY.value) >= Math.abs(lengthX.value)) {
+    return `translateX(-${baseOffset}%)`;
+  }
+  let pixelOffset = lengthX.value;
+  // 限制滑动范围，避免过度拖拽
+  if (pageIndex.value === 0 && pixelOffset < 0) {
+    pixelOffset *= 0.3;
+  }
+  if (pageIndex.value === 1 && pixelOffset > 0) {
+    pixelOffset *= 0.3;
+  }
+  return `translateX(calc(-${baseOffset}% - ${pixelOffset}px))`;
+});
 </script>
 
 <style lang="scss" scoped>
@@ -209,6 +250,8 @@ const contentTransform = computed(() => `translateX(-${pageIndex.value * 50}%)`)
   height: 100%;
   position: relative;
   overflow: hidden;
+  // 禁止上下方向的原生回弹/滚动，保证页面固定不上下移动
+  overscroll-behavior: none;
   display: flex;
   flex-direction: column;
   .top-bar {
@@ -246,6 +289,10 @@ const contentTransform = computed(() => `translateX(-${pageIndex.value * 50}%)`)
     width: 200%;
     height: 100%;
     transition: transform 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+    &.swiping {
+      // 拖拽过程中关闭过渡，内容实时跟随手指
+      transition: none;
+    }
     .page {
       width: 50%;
       height: 100%;
