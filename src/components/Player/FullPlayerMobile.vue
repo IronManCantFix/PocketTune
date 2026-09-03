@@ -52,6 +52,14 @@
               >
                 <SvgIcon name="AddList" :size="26" />
               </div>
+              <!-- 上传至云盘 -->
+              <div
+                v-if="canUploadToCloud && settingStore.fullscreenPlayerElements.uploadToCloud"
+                class="action-btn"
+                @click.stop="openCloudUpload(musicStore.playSong)"
+              >
+                <SvgIcon name="Cloud" :size="26" />
+              </div>
             </div>
           </div>
 
@@ -174,8 +182,8 @@ import { useSwipe } from "@vueuse/core";
 import { useMusicStore, useStatusStore, useDataStore, useSettingStore } from "@/stores";
 import { usePlayerController } from "@/core/player/PlayerController";
 import { useTimeFormat } from "@/composables/useTimeFormat";
-import { toLikeSong } from "@/utils/auth";
-import { openPlaylistAdd } from "@/utils/modal";
+import { toLikeSong, isLogin } from "@/utils/auth";
+import { openPlaylistAdd, openCloudUpload } from "@/utils/modal";
 import { removeBrackets } from "@/utils/format";
 
 const musicStore = useMusicStore();
@@ -184,6 +192,15 @@ const settingStore = useSettingStore();
 const dataStore = useDataStore();
 const player = usePlayerController();
 const { timeDisplay, toggleTimeFormat } = useTimeFormat();
+
+// 是否可以上传至云盘（在线普通歌曲且已登录）
+const canUploadToCloud = computed(
+  () =>
+    !musicStore.playSong.path &&
+    !musicStore.playSong.pc &&
+    musicStore.playSong.type === "song" &&
+    isLogin() === 1,
+);
 
 const mobileStart = ref<HTMLElement | null>(null);
 const pageIndex = ref(0);
