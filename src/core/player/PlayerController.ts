@@ -587,7 +587,7 @@ class PlayerController {
       const playTitle = `${name} - ${artist}`;
       // 更新状态
       statusStore.playStatus = true;
-      window.document.title = `${playTitle} | SPlayer`;
+      window.document.title = `${playTitle} | PocketTune`;
       // 只有真正播放了才重置重试计数
       if (this.retryInfo.count > 0) this.retryInfo.count = 0;
       // 注意：failSkipCount 的重置移至 onTimeUpdate，确保有实际进度
@@ -599,7 +599,7 @@ class PlayerController {
     audioManager.addEventListener("pause", () => {
       statusStore.playStatus = false;
       useAutomixManager().resetAutomixScheduling("IDLE");
-      window.document.title = "SPlayer";
+      window.document.title = "PocketTune";
       lastfmScrobbler.pause();
       console.log(`⏸️ [${musicStore.playSong?.id}] 歌曲暂停`);
     });

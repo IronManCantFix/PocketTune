@@ -4,7 +4,7 @@
     <!-- Logo -->
     <div :class="['logo', { collapsed: statusStore.menuCollapsed }]" @click="router.push('/')">
       <Logo />
-      <n-text>SPlayer</n-text>
+      <n-text>PocketTune</n-text>
     </div>
     <n-scrollbar
       :style="{

@@ -3,16 +3,20 @@
     <div class="set-list">
       <n-h3 prefix="bar"> 关于软件 </n-h3>
       <n-alert type="info" style="margin-bottom: 12px">
-        <template #header>本项目为 SPlayer 的分支二次开发</template>
-        主要适配移动端的 Web 音乐播放器，感谢原作者 imsyy。本项目开源地址：
-        <n-button text type="primary" @click="openLink(FORK_REPO_URL)">
-          {{ FORK_REPO_URL.replace("https://github.com/", "") }}
-        </n-button>
+        <template #header>本项目为 PocketTune（SPlayer 的分支二次开发）</template>
+        主要适配移动端的 Web 音乐播放器，感谢原作者 imsyy。本项目为开源项目，欢迎 Star / 提交
+        Issue：
+        <n-flex align="center" :size="6" style="margin-top: 8px">
+          <SvgIcon name="Github" :size="20" />
+          <n-a :href="FORK_REPO_URL" target="_blank" rel="noopener">
+            {{ FORK_REPO_URL.replace("https://github.com/", "") }}
+          </n-a>
+        </n-flex>
       </n-alert>
       <n-card class="set-item">
         <n-flex align="center" class="about">
           <SvgIcon name="SPlayer" size="26" />
-          <n-text class="logo-name">SPlayer</n-text>
+          <n-text class="logo-name">PocketTune</n-text>
           <n-tag v-if="statusStore.isDeveloperMode" size="small" type="warning" round> DEV </n-tag>
           <n-tag size="small" type="primary" round @click="openDeveloperMode">
             {{ packageJson.version }}
