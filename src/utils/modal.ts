@@ -167,8 +167,16 @@ export const openPlaylistAdd = async (data: SongType[], isLocal: boolean) => {
  * @param data 歌曲列表
  * @param isLocal 是否为本地音乐
  * @param playListId 歌单 id
+ * @param isCloud 是否为云盘场景
+ * @param onSuccess 操作成功后的回调
  */
-export const openBatchList = async (data: SongType[], isLocal: boolean, playListId?: number) => {
+export const openBatchList = async (
+  data: SongType[],
+  isLocal: boolean,
+  playListId?: number,
+  isCloud: boolean = false,
+  onSuccess?: () => void,
+) => {
   const { default: BatchList } = await import("@/components/Modal/BatchList.vue");
   window.$modal.create({
     preset: "card",
@@ -178,7 +186,7 @@ export const openBatchList = async (data: SongType[], isLocal: boolean, playList
       maxWidth: "70vw",
     },
     title: "批量操作",
-    content: () => h(BatchList, { data, isLocal, playListId }),
+    content: () => h(BatchList, { data, isLocal, playListId, isCloud, onSuccess }),
   });
 };
 
@@ -282,6 +290,34 @@ export const openCloudUpload = async (song: SongType) => {
     title: "上传至云盘",
     content: () => {
       return h(CloudUploadModal, { song, onClose: () => modal.destroy() });
+    },
+  });
+};
+
+// 上传本地歌曲文件到云盘
+export const openCloudUploadFile = async (onSuccess?: () => void) => {
+  if (!isLogin()) return openUserLogin();
+  const modalKey = "cloud-upload-file";
+  if (isModalOpen(modalKey, "上传窗口已打开，请勿重复操作")) return;
+  setModalOpen(modalKey);
+  const { default: CloudUploadFileModal } =
+    await import("@/components/Modal/CloudUploadFileModal.vue");
+  const modal = window.$modal.create({
+    preset: "card",
+    transformOrigin: "center",
+    autoFocus: false,
+    style: { width: "600px" },
+    title: "上传歌曲",
+    content: () => {
+      return h(CloudUploadFileModal, {
+        onClose: () => {
+          modal.destroy();
+          setModalClosed(modalKey);
+        },
+        onSuccess: () => {
+          if (isFunction(onSuccess)) onSuccess();
+        },
+      });
     },
   });
 };

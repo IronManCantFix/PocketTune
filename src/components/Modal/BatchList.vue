@@ -53,7 +53,7 @@
           </template>
           批量下载
         </n-button>
-        <!-- 批量删除 -->
+        <!-- 批量删除（歌单场景） -->
         <n-button
           v-if="playListId"
           :disabled="!checkCount"
@@ -69,6 +69,21 @@
               },
             )
           "
+        >
+          <template #icon>
+            <SvgIcon name="Delete" />
+          </template>
+          删除选中的歌曲
+        </n-button>
+        <!-- 批量删除（云盘场景） -->
+        <n-button
+          v-if="isCloud && !playListId"
+          :disabled="!checkCount"
+          :loading="deleting"
+          type="error"
+          strong
+          secondary
+          @click="handleBatchDeleteCloud"
         >
           <template #icon>
             <SvgIcon name="Delete" />
@@ -102,8 +117,13 @@ import { deleteSongs } from "@/utils/auth";
 import { NInputNumber, NButton, NText, NFlex } from "naive-ui";
 import { useStatusStore } from "@/stores";
 import { openDownloadSongs } from "@/utils/modal";
+import { deleteCloudSong } from "@/api/cloud";
+import { useDataStore } from "@/stores";
+import { usePlayerController } from "@/core/player/PlayerController";
 
 const statusStore = useStatusStore();
+const dataStore = useDataStore();
+const player = usePlayerController();
 
 interface DataType {
   key?: number;
@@ -119,6 +139,10 @@ const props = defineProps<{
   data: SongType[];
   isLocal: boolean;
   playListId?: number;
+  // 是否为云盘场景
+  isCloud?: boolean;
+  // 批量删除成功后的回调
+  onSuccess?: () => void;
 }>();
 
 // 选中数据
@@ -221,6 +245,51 @@ const handleBatchDownloadClick = () => {
     return;
   }
   openDownloadSongs(checkSongData.value);
+};
+
+// 云盘批量删除状态
+const deleting = ref<boolean>(false);
+
+// 云盘批量删除处理
+const handleBatchDeleteCloud = () => {
+  if (checkCount.value === 0) {
+    window.$message.warning("请选择要删除的歌曲");
+    return;
+  }
+  const ids = checkSongData.value.map((item) => item.id);
+  window.$dialog.warning({
+    title: "删除云盘歌曲",
+    content: `确定从云盘中删除选中的 ${ids.length} 首歌曲吗？该操作无法撤销！`,
+    positiveText: "删除",
+    negativeText: "取消",
+    onPositiveClick: async () => {
+      deleting.value = true;
+      try {
+        let successCount = 0;
+        for (const id of ids) {
+          const result = await deleteCloudSong(id);
+          if (result.code === 200) successCount++;
+        }
+        // 同步清理当前播放列表中已删除的云盘歌曲
+        // 从后往前删除，避免索引错位
+        const removedSet = new Set(ids);
+        const playList = dataStore.playList;
+        for (let i = playList.length - 1; i >= 0; i--) {
+          if (playList[i].id && removedSet.has(playList[i].id)) {
+            player.removeSongIndex(i);
+          }
+        }
+        window.$message.success(`成功删除 ${successCount} 首云盘歌曲`);
+        // 触发回调重新拉取云盘列表
+        if (props.onSuccess) props.onSuccess();
+      } catch (error) {
+        console.error("批量删除云盘歌曲失败:", error);
+        window.$message.error("删除失败，请重试");
+      } finally {
+        deleting.value = false;
+      }
+    },
+  });
 };
 </script>
 

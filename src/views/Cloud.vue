@@ -97,7 +97,7 @@ import { useDataStore } from "@/stores";
 import { userCloud } from "@/api/cloud";
 import { formatSongsList } from "@/utils/format";
 import { fuzzySearch, renderIcon } from "@/utils/helper";
-import { openBatchList } from "@/utils/modal";
+import { openBatchList, openCloudUploadFile } from "@/utils/modal";
 import { usePlayerController } from "@/core/player/PlayerController";
 
 const router = useRouter();
@@ -132,10 +132,18 @@ const isCloudPage = computed<boolean>(() => router.currentRoute.value.name === "
 // 更多操作
 const moreOptions = computed<DropdownOption[]>(() => [
   {
+    label: "上传歌曲",
+    key: "upload",
+    props: {
+      onClick: () => openCloudUploadFile(getAllCloudMusic),
+    },
+    icon: renderIcon("FolderMusic"),
+  },
+  {
     label: "批量操作",
     key: "batch",
     props: {
-      onClick: () => openBatchList(cloudData.value, false),
+      onClick: () => openBatchList(cloudData.value, false, undefined, true, getAllCloudMusic),
     },
     icon: renderIcon("Batch"),
   },
