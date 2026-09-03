@@ -19,7 +19,13 @@ const initAppServer = async () => {
     });
     // 注册插件
     server.register(fastifyCookie);
-    server.register(fastifyMultipart);
+    // 云盘上传等场景需解析大文件，放开 multipart 文件大小限制（默认继承 1MB bodyLimit）
+    server.register(fastifyMultipart, {
+      limits: {
+        // 单文件上限：200MB，覆盖常见音频文件
+        fileSize: 200 * 1024 * 1024,
+      },
+    });
     // 声明
     server.get("/api", (_, reply) => {
       reply.send({
