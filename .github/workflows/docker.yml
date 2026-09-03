@@ -2,15 +2,9 @@ name: Publish Docker image to ghcr.io
 
 on:
   push:
-    branches: [dev]
-    paths:
-      - "Dockerfile"
-      - "nginx.conf"
-      - "package.json"
-      - "pnpm-lock.yaml"
-      - ".github/workflows/docker.yml"
-      - "src/**"
-      - "server/**"
+    # 仅在打 tag 时发布镜像（dev 开发分支不再触发构建）
+    tags:
+      - "v*"
   release:
     types: [published]
   workflow_dispatch:
