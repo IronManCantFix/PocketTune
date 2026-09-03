@@ -1,8 +1,14 @@
 # 构建阶段
 FROM node:22-alpine AS builder
 
-# 安装 pnpm
-RUN npm install -g pnpm
+# 启用 corepack 并激活 packageManager 声明的 pnpm 版本
+# （避免 npm install -g pnpm 拉取最新版 standalone 二进制的身份校验问题）
+RUN corepack enable
+ARG PNPM_VERSION=10.34.5
+RUN corepack prepare pnpm@${PNPM_VERSION} --activate
+
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
 
 WORKDIR /app
 
