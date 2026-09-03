@@ -269,6 +269,23 @@ export const openDownloadSong = async (song: SongType) => {
   });
 };
 
+// 上传至云盘（下载后上传）
+export const openCloudUpload = async (song: SongType) => {
+  if (!isLogin()) return openUserLogin();
+  if (!song?.id) return window.$message.warning("请正确选择歌曲");
+  const { default: CloudUploadModal } = await import("@/components/Modal/CloudUploadModal.vue");
+  const modal = window.$modal.create({
+    preset: "card",
+    transformOrigin: "center",
+    autoFocus: false,
+    style: { width: "600px" },
+    title: "上传至云盘",
+    content: () => {
+      return h(CloudUploadModal, { song, onClose: () => modal.destroy() });
+    },
+  });
+};
+
 // 批量下载歌曲
 export const openDownloadSongs = async (songs: SongType[]): Promise<void> => {
   if (!isLogin()) return openUserLogin();

@@ -42,7 +42,7 @@ export const matchCloudSong = (uid: number, sid: number, asid: number) => {
 };
 
 // 上传歌曲到云盘
-export const uploadCloudSong = (file: File) => {
+export const uploadCloudSong = (file: File, onUploadProgress?: (percent: number) => void) => {
   const formData = new FormData();
   formData.append("songFile", file);
   return request({
@@ -54,6 +54,11 @@ export const uploadCloudSong = (file: File) => {
     data: formData,
     params: {
       timestamp: Date.now(),
+    },
+    onUploadProgress: (event) => {
+      if (typeof onUploadProgress === "function" && event.total) {
+        onUploadProgress(Math.round((event.loaded * 100) / event.total));
+      }
     },
   });
 };

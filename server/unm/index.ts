@@ -5,7 +5,7 @@ import { serverLog } from "../utils/logger";
 import { getStoreValue, setStoreValue } from "../netease/config-store";
 
 // 默认音源列表
-const DEFAULT_SOURCES = ["kugou", "kuwo", "bilibili", "pyncmd"];
+const DEFAULT_SOURCES = ["kugou", "migu", "pyncmd"];
 
 // 暴露默认顺序给 sources 接口展示
 export const getDefaultSources = (): string[] => [...DEFAULT_SOURCES];

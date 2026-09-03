@@ -39,6 +39,14 @@
           >
             <SvgIcon name="Download" />
           </div>
+          <!-- 上传至云盘 -->
+          <div
+            class="menu-icon"
+            v-if="canUploadToCloud && settingStore.fullscreenPlayerElements.uploadToCloud"
+            @click.stop="openCloudUpload(musicStore.playSong)"
+          >
+            <SvgIcon name="Cloud" />
+          </div>
           <!-- 显示评论 -->
           <n-badge
             :value="formatCommentCount(statusStore.songCommentCount)"
@@ -151,9 +159,9 @@
 import { usePlayerController } from "@/core/player/PlayerController";
 import { useSongManager } from "@/core/player/SongManager";
 import { useDataStore, useMusicStore, useStatusStore, useSettingStore } from "@/stores";
-import { toLikeSong } from "@/utils/auth";
+import { toLikeSong, isLogin } from "@/utils/auth";
 import { useTimeFormat } from "@/composables/useTimeFormat";
-import { openDownloadSong, openPlaylistAdd } from "@/utils/modal";
+import { openDownloadSong, openPlaylistAdd, openCloudUpload } from "@/utils/modal";
 import { getComment } from "@/api/comment";
 import { formatCommentCount } from "@/utils/format";
 
@@ -166,6 +174,15 @@ const songManager = useSongManager();
 const player = usePlayerController();
 
 const { timeDisplay, toggleTimeFormat } = useTimeFormat();
+
+// 是否可以上传至云盘（在线普通歌曲且已登录）
+const canUploadToCloud = computed(
+  () =>
+    !musicStore.playSong.path &&
+    !musicStore.playSong.pc &&
+    musicStore.playSong.type === "song" &&
+    isLogin() === 1,
+);
 
 // 获取评论数量
 const fetchCommentCount = async () => {

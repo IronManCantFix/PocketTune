@@ -1,3 +1,64 @@
+<div align="center">
+<img alt="logo" height="100" width="100" src="public/icons/favicon.png" />
+<h1> PocketTune </h1>
+<p> 适配移动端 / NAS 部署的纯 Web 网易云音乐客户端 </p>
+</div>
+
+## 📌 项目说明
+
+本项目是 [SPlayer-Dev/SPlayer](https://github.com/SPlayer-Dev/SPlayer)（原作者 [imsyy](https://github.com/imsyy)）的一个 **Fork**。
+
+首先要**特别感谢原作者** `imsyy` 开发了 SPlayer 这个非常出色的音乐播放器。我一直在寻找一个在移动端适配良好、并且可以登录网易云音乐的 Web 音乐客户端，而 SPlayer 做得非常好，完全符合我的需求。
+
+我 Fork 这个项目的主要目的是：**在自己的 NAS 上部署一个纯 Web 的音乐客户端**，这样在飞牛 (FeiNiu) 系统中，就可以像使用普通 Web 应用一样直接在飞牛 App 里访问网易云音乐，而无需额外安装桌面端程序。
+
+### 🎯 我的使用场景
+
+1. **NAS 部署**：通过 Docker 一键部署到我的 NAS 上，浏览器即可访问
+2. **飞牛 (FeiNiu) 访问**：在飞牛 App 内直接打开 Web 界面，随时随地听歌
+3. **移动端优先**：重点优化手机 / 平板上的浏览和播放体验
+4. **网易云音乐登录**：完整保留并重点验证扫码 / 手机号登录能力
+
+### 🔧 本 Fork 的主要改动（相比原项目）
+
+> 改造目标：把项目从「桌面客户端 + Web」混合形态，精简为「纯 Web、优先移动端、面向 NAS 部署」。
+
+- **移除桌面端打包**：彻底移除 `Electron` 桌面端及相关代码
+  - 删除 `electron/` 全部代码（主进程、preload、IPC、窗口管理、系统托盘等）
+  - 删除 `native/` 下的 Rust 原生模块（任务栏歌词、外部媒体集成、本地扫描等）
+  - 删除桌面端才需要的能力：Windows 任务栏歌词、Discord RPC、本地播放器 (mpv)、本地音乐管理等
+  - 移除首次打开时的用户协议弹窗
+- **切换为纯 Web 部署**：支持 Docker / Vercel / 静态托管
+  - 原 `electron/server` 改为独立的 `server/`（Fastify 后端），随 Docker 镜像一起分发
+  - 保留并支持 `pnpm api` 本地启动后端
+  - Docker 镜像内已包含前端 `dist/` 产物 + 后端服务，默认监听 `25884` 端口
+- **优化移动端 UI 适配**：
+  - 播放器：歌名 / 喜欢 / 更多按钮不再挤压艺术家信息；全屏播放器禁止左右滑动拖动，仅通过指示器切换
+  - 卡片：`SongCard` 多标签横排改为自动换行
+  - 标题字号：`DailySongs` 标题移动端由 55px 缩为 30px，避免溢出
+  - 搜索：关键词 36px + 6 个 tab 在窄屏下的溢出问题修复
+  - 歌词：`DefaultLyric` Pure 模式 80px padding 窄屏缩为 20px
+  - 安全区：底部播放器适配 iOS 底部安全区消除白线，顶部导航适配 iOS 顶部 Safe Area 避让刘海
+  - 各页面（Video / Comment / Wiki / Discover / Cloud / History / Like）移动端标题字号与菜单适配
+  - 云盘页标题改为自适应高度，避免被顶部搜索栏遮挡
+- **CI / 部署调整**：
+  - Docker 镜像改为推送到 `ghcr.io`（删除 Docker Hub 步骤）
+  - 部分桌面端依赖、构建脚本与配置文件删除
+
+如需关注移动端待优化问题，可参考 `docs/mobile-ui-text-overlap-issues.md` 问题清单。
+
+### ⚠️ 说明
+
+- 底部为**原项目 (SPlayer) 的 README**，内容未做改动，仅用于保留原始使用说明与文档
+- 本项目遵循原项目的 **AGPL-3.0** 开源许可，使用时请遵守相关条款
+- 本 Fork 为个人自用并对外开源，如有相关建议或改进，欢迎提交 Issue / PR
+
+---
+
+> 以下内容为**原项目 SPlayer 的 README**，保留原样，仅供参考
+
+---
+
 > [!CAUTION]
 >
 > # 本项目进入维护模式
@@ -279,3 +340,7 @@ docker run -d --name SPlayer -p 25884:25884 imsyy/splayer:latest
 ## ⭐ Star History
 
 [![Star History Chart](https://api.star-history.com/svg?repos=imsyy/SPlayer&type=Date)](https://star-history.com/#imsyy/SPlayer&Date)
+
+---
+
+> 以上内容为**原项目 SPlayer 的 README**，已保留原样。本 Fork（PocketTune）的说明请参见顶部「📌 项目说明」。

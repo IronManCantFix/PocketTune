@@ -56,8 +56,9 @@ const settingStore = useSettingStore();
 type SourceItem = { key: string; label: string; enabled: boolean };
 
 // 按已启用顺序 + 未启用音源排列
-const initList = (): SourceItem[] => {
-  const enabled = settingStore.unblockSources
+const initList = (enabledKeys?: string[]): SourceItem[] => {
+  const sourceKeys = enabledKeys ?? settingStore.unblockSources;
+  const enabled = sourceKeys
     .map((key) => KNOWN_SOURCES.find((s) => s.key === key))
     .filter((s): s is { key: string; label: string } => !!s)
     .map((s) => ({ ...s, enabled: true }));
@@ -114,6 +115,10 @@ onMounted(async () => {
     const res = await getUnblockSources();
     effective.value = res?.sources ?? [];
     custom.value = !!res?.custom;
+    // 未自定义时按服务端生效顺序回填开关状态，与默认顺序保持一致
+    if (settingStore.unblockSources.length === 0 && res?.sources?.length && !res?.custom) {
+      list.value = initList(res.sources);
+    }
   } catch (error) {
     console.error("解灰音源读取失败:", error);
   }

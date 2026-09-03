@@ -374,6 +374,7 @@ export interface SettingState {
     like: boolean;
     addToPlaylist: boolean;
     download: boolean;
+    uploadToCloud: boolean;
     comments: boolean;
     desktopLyric: boolean;
     moreSettings: boolean;
@@ -669,6 +670,7 @@ export const useSettingStore = defineStore("setting", {
       like: true,
       addToPlaylist: true,
       download: true,
+      uploadToCloud: true,
       comments: true,
       desktopLyric: true,
       moreSettings: true,
