@@ -45,6 +45,8 @@ export enum AudioErrorCode {
   SRC_NOT_SUPPORTED = 4,
   /** DOMException: AbortError */
   DOM_ABORT = 20,
+  /** 回退错误（兼容旧版本错误码） */
+  FALLBACK_ERROR = 9,
 }
 
 const SEEK_FADE_TIME = 0.05;
@@ -227,7 +229,7 @@ export abstract class BaseAudioPlayer
       fadeCurve?: FadeCurve;
       keepContextRunning?: boolean;
     } = {},
-  ) {
+  ): Promise<void> {
     this.cancelPendingPause();
 
     const duration = options.fadeOut ? (options.fadeDuration ?? 0.5) : 0;
@@ -248,10 +250,13 @@ export abstract class BaseAudioPlayer
 
     if (duration > 0) {
       this.applyFadeTo(0, duration, options.fadeCurve);
-
-      this.fadeTimer = setTimeout(() => {
-        performPause();
-      }, duration * 1000);
+      // 返回 Promise，确保调用方可以等待淡出完成
+      return new Promise<void>((resolve) => {
+        this.fadeTimer = setTimeout(async () => {
+          await performPause();
+          resolve();
+        }, duration * 1000);
+      });
     } else {
       await performPause();
     }

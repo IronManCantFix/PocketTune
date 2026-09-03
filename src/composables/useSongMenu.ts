@@ -37,7 +37,7 @@ export const useSongMenu = () => {
       negativeText: "取消",
       onPositiveClick: async () => {
         const result = await deleteCloudSong(song.id);
-        if (result.code == 200) {
+        if (result.code === 200) {
           dataStore.cloudPlayList.splice(index, 1);
           dataStore.setCloudPlayList(dataStore.cloudPlayList);
           const currentPlayList = dataStore.playList;

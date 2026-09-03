@@ -32,7 +32,7 @@
           <template v-for="(artist, index) in artistsList" :key="index">
             <n-grid :cols="24" :x-gap="12">
               <n-form-item-gi
-                :span="14"
+                :span="{ xxl: 14, xl: 14, lg: 14, md: 14, sm: 24, xs: 24 }"
                 :label="artistsList.length > 1 ? `歌手 ${index + 1}` : '歌手'"
               >
                 <n-input-group>
@@ -49,7 +49,11 @@
                   </n-button>
                 </n-input-group>
               </n-form-item-gi>
-              <n-form-item-gi :span="10" label="ID" v-if="artist.id">
+              <n-form-item-gi
+                :span="{ xxl: 10, xl: 10, lg: 10, md: 10, sm: 24, xs: 24 }"
+                label="ID"
+                v-if="artist.id"
+              >
                 <n-input-group>
                   <n-input :value="String(artist.id)" readonly />
                   <n-button
@@ -67,7 +71,10 @@
             </n-grid>
           </template>
           <n-grid :cols="24" :x-gap="12" v-if="albumData">
-            <n-form-item-gi :span="14" label="专辑">
+            <n-form-item-gi
+              :span="{ xxl: 14, xl: 14, lg: 14, md: 14, sm: 24, xs: 24 }"
+              label="专辑"
+            >
               <n-input-group>
                 <n-input :value="albumData.name" readonly placeholder="暂无专辑信息" />
                 <n-button
@@ -82,7 +89,11 @@
                 </n-button>
               </n-input-group>
             </n-form-item-gi>
-            <n-form-item-gi :span="10" label="ID" v-if="albumData.id">
+            <n-form-item-gi
+              :span="{ xxl: 10, xl: 10, lg: 10, md: 10, sm: 24, xs: 24 }"
+              label="ID"
+              v-if="albumData.id"
+            >
               <n-input-group>
                 <n-input :value="String(albumData.id)" readonly />
                 <n-button
@@ -100,7 +111,10 @@
           </n-grid>
           <n-divider class="divider"> 歌曲信息 </n-divider>
           <n-grid :cols="24" :x-gap="12">
-            <n-form-item-gi :span="12" label="歌曲 ID">
+            <n-form-item-gi
+              :span="{ xxl: 12, xl: 12, lg: 12, md: 12, sm: 24, xs: 24 }"
+              label="歌曲 ID"
+            >
               <n-input-group>
                 <n-input :value="String(songInfo?.id || '')" readonly />
                 <n-button
@@ -115,7 +129,10 @@
                 </n-button>
               </n-input-group>
             </n-form-item-gi>
-            <n-form-item-gi :span="12" label="时长">
+            <n-form-item-gi
+              :span="{ xxl: 12, xl: 12, lg: 12, md: 12, sm: 24, xs: 24 }"
+              label="时长"
+            >
               <n-input-group>
                 <n-input :value="duration" readonly />
                 <n-button type="primary" strong secondary @click="copyText(duration, '时长')">

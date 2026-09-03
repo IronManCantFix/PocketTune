@@ -53,6 +53,13 @@ class LyricManager {
   constructor() {}
 
   /**
+   * 清除预加载歌词缓存
+   */
+  public clearPrefetchedLyric() {
+    this.prefetchedLyric = null;
+  }
+
+  /**
    * 重置当前歌曲的歌词数据
    * 包括清空歌词数据、重置歌词索引、关闭 TTML 歌词等
    */
@@ -66,6 +73,8 @@ class LyricManager {
     // 重置歌词索引
     statusStore.lyricIndex = -1;
     statusStore.lyricLoading = false;
+    // 清除预加载缓存
+    this.clearPrefetchedLyric();
   }
 
   /**

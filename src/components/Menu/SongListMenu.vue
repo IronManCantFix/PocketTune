@@ -118,7 +118,7 @@ const openDropdown = (
 defineExpose({ openDropdown });
 </script>
 
-<style lang="scss">
+<style lang="scss" scoped>
 .delete-mata {
   display: flex;
 }

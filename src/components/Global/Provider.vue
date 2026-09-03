@@ -41,7 +41,6 @@ import {
 import { useSettingStore, useStatusStore } from "@/stores";
 import { setColorSchemes, MONOTONOUS_THEME } from "@/utils/color";
 import { useCustomCode } from "@/composables/useCustomCode";
-// import { rgbToHex } from "@imsyy/color-utils";
 import themeColor from "@/assets/data/themeColor.json";
 
 const statusStore = useStatusStore();

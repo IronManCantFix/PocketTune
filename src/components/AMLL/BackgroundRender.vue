@@ -174,12 +174,7 @@ defineExpose({
 </script>
 
 <template>
-  <div
-    ref="wrapper-ref"
-    class="background-render-wrapper"
-    style="display: contents"
-    aria-hidden="true"
-  />
+  <div ref="wrapperRef" class="background-render-wrapper" aria-hidden="true" />
 </template>
 
 <style scoped lang="scss">

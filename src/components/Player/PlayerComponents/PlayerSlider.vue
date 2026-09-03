@@ -19,6 +19,7 @@ import { useMusicStore, useSettingStore, useStatusStore } from "@/stores";
 import { msToTime } from "@/utils/time";
 import { usePlayerController } from "@/core/player/PlayerController";
 import { LyricLine } from "@applemusic-like-lyrics/lyric";
+import { useThrottleFn } from "@vueuse/core";
 
 withDefaults(defineProps<{ showTooltip?: boolean }>(), { showTooltip: true });
 
@@ -47,9 +48,14 @@ const sliderProgress = computed({
       return;
     }
     // 结束或者为点击
-    useThrottleFn((value: number) => setSeek(value), 30);
+    throttledSeek(value);
   },
 });
+
+// 节流 seek，避免频繁调用（提取到 computed 外部，确保节流有效）
+const throttledSeek = useThrottleFn((value: number) => {
+  setSeek(value);
+}, 30);
 
 // 开始拖拽
 const startDrag = () => {

@@ -162,27 +162,41 @@ onMounted(() => songManager.initPersonalFM());
   }
   .info {
     height: 100%;
+    min-width: 0;
     display: flex;
     flex-direction: column;
+    overflow: hidden;
     .n-text {
       line-height: normal;
     }
     .name {
       font-size: 22px;
       font-weight: bold;
+      min-width: 0;
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
     .artists {
       margin-top: 2px;
       font-size: 14px;
+      min-width: 0;
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
       .n-icon {
         font-size: 18px;
         margin-right: 4px;
         transform: translateY(3px);
+        flex-shrink: 0;
       }
       .ar {
         display: inline-flex;
         transition: opacity 0.3s;
         opacity: 0.6;
+        flex-shrink: 0;
         &::after {
           content: "/";
           margin: 0 4px;
@@ -196,10 +210,16 @@ onMounted(() => songManager.initPersonalFM());
     }
     .album {
       font-size: 14px;
+      min-width: 0;
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
       .n-icon {
         font-size: 18px;
         margin-right: 4px;
         transform: translateY(3px);
+        flex-shrink: 0;
       }
       .album-text {
         transition: opacity 0.3s;
@@ -208,9 +228,11 @@ onMounted(() => songManager.initPersonalFM());
     }
     .menu {
       margin-top: auto;
+      flex-shrink: 0;
       .play {
         width: 46px;
         height: 46px;
+        flex-shrink: 0;
         .n-icon {
           color: var(--primary-hex);
           transition: opacity 0.1s ease-in-out;
@@ -222,6 +244,7 @@ onMounted(() => songManager.initPersonalFM());
         justify-content: center;
         width: 38px;
         height: 38px;
+        flex-shrink: 0;
         border-radius: 50%;
         color: var(--primary-hex);
         transition:
@@ -245,11 +268,19 @@ onMounted(() => songManager.initPersonalFM());
       .name {
         font-size: 24px;
         margin-bottom: 6px;
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
       }
       .artists {
         margin-top: 0;
         font-size: 15px;
         opacity: 0.8;
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
       }
       .menu {
         margin-top: 28px;
@@ -259,6 +290,7 @@ onMounted(() => songManager.initPersonalFM());
           width: 42px;
           height: 42px;
           background-color: rgba(var(--primary), 0.06);
+          flex-shrink: 0;
           &:hover {
             background-color: rgba(var(--primary), 0.12);
           }
@@ -266,6 +298,7 @@ onMounted(() => songManager.initPersonalFM());
         .play {
           width: 52px;
           height: 52px;
+          flex-shrink: 0;
         }
       }
     }

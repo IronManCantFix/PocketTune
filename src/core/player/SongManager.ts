@@ -95,7 +95,17 @@ class SongManager {
    */
   public getOnlineUrl = async (id: number, isPc: boolean = false): Promise<AudioSource> => {
     const settingStore = useSettingStore();
-    let level: string = isPc ? "exhigh" : settingStore.songLevel;
+    type AudioLevel =
+      | "standard"
+      | "higher"
+      | "exhigh"
+      | "lossless"
+      | "hires"
+      | "jyeffect"
+      | "sky"
+      | "dolby"
+      | "jymaster";
+    let level: AudioLevel = isPc ? "exhigh" : (settingStore.songLevel as AudioLevel);
 
     // Fuck AI Mode: 如果开启，且请求的 level 是 AI 音质，降级为 hires
     if (settingStore.disableAiAudio && AI_AUDIO_LEVELS.includes(level)) {
@@ -125,8 +135,8 @@ class SongManager {
       }
     }
 
-    const res = await songUrl(id, level as any);
-    console.log(`🌐 ${id} music data:`, res);
+    const res = await songUrl(id, level);
+    console.debug(`🌐 ${id} music data:`, res);
 
     // 兼容新旧接口的数据结构
     const songData = Array.isArray(res.data) ? res.data[0] : res.data?.[0];

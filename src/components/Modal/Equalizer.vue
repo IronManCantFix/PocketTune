@@ -130,6 +130,12 @@ watch(enabled, () => applyEq());
     grid-template-columns: repeat(10, 1fr);
     gap: 12px;
     margin-top: 20px;
+    // 移动端：横向滚动
+    @media (max-width: 768px) {
+      grid-template-columns: repeat(10, 50px);
+      overflow-x: auto;
+      padding-bottom: 8px;
+    }
     .eq-col {
       display: flex;
       flex-direction: column;

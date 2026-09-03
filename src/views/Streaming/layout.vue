@@ -574,7 +574,7 @@ onMounted(async () => {
   .router-view {
     flex: 1;
     overflow: hidden;
-    max-height: calc((var(--layout-height) - 132) * 1px);
+    max-height: calc((var(--layout-height, calc(100vh - 132px)) - 132) * 1px);
   }
   @media (max-width: 512px) {
     .status {

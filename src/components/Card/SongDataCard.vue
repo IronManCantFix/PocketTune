@@ -73,12 +73,12 @@ defineProps<{
     padding: 16px;
     display: flex;
     align-items: center;
-    padding: 16px;
   }
   .cover {
     width: 80px;
     height: 80px;
     min-width: 80px;
+    flex-shrink: 0;
     border-radius: 12px;
     margin-right: 12px;
     display: flex;
@@ -97,7 +97,9 @@ defineProps<{
     flex-direction: column;
     align-self: stretch;
     justify-content: space-around;
-    flex: 1;
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
     :deep(.n-skeleton) {
       height: 20px;
       margin-bottom: 12px;
@@ -105,20 +107,32 @@ defineProps<{
     .name {
       font-size: 20px;
       font-weight: bold;
+      min-width: 0;
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
     .artists {
       margin-top: 2px;
       font-size: 14px;
+      min-width: 0;
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
       .n-icon {
         font-size: 18px;
         margin-right: 4px;
         transform: translateY(3px);
+        flex-shrink: 0;
       }
       .ar {
         display: inline-flex;
         transition: opacity 0.3s;
         opacity: 0.6;
         cursor: pointer;
+        flex-shrink: 0;
         &::after {
           content: "/";
           margin: 0 4px;
@@ -135,10 +149,16 @@ defineProps<{
     }
     .album {
       font-size: 14px;
+      min-width: 0;
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
       .n-icon {
         font-size: 18px;
         margin-right: 4px;
         transform: translateY(3px);
+        flex-shrink: 0;
       }
       .album-text {
         transition: opacity 0.3s;
@@ -150,6 +170,26 @@ defineProps<{
           opacity: 1;
           color: var(--primary-hex);
         }
+      }
+    }
+  }
+  @media (max-width: 480px) {
+    :deep(.n-card__content) {
+      padding: 12px;
+    }
+    .cover {
+      width: 56px;
+      height: 56px;
+      min-width: 56px;
+      margin-right: 8px;
+    }
+    .data {
+      .name {
+        font-size: 16px;
+      }
+      .artists,
+      .album {
+        font-size: 12px;
       }
     }
   }

@@ -430,7 +430,6 @@ export const useStatusStore = defineStore("status", {
       "playRate",
       "playVolume",
       "playVolumeMute",
-      "playSongType",
       "repeatMode",
       "shuffleMode",
       "songCoverTheme",

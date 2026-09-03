@@ -1,0 +1,82 @@
+// 统一响应式断点
+// 与 src/composables/useMobile.ts 保持一致
+
+// 断点像素值
+$bp-small: 512px; // 超小屏
+$bp-mobile: 640px; // 移动端
+$bp-small-screen: 768px; // 小屏设备（平板竖屏）
+$bp-tablet: 990px; // 平板
+$bp-desktop: 1024px; // 桌面端
+$bp-large-desktop: 1280px; // 大桌面端
+
+// 断点 mixin（max-width）
+@mixin small {
+  @media (max-width: $bp-small) {
+    @content;
+  }
+}
+
+@mixin mobile {
+  @media (max-width: $bp-mobile) {
+    @content;
+  }
+}
+
+@mixin small-screen {
+  @media (max-width: $bp-small-screen) {
+    @content;
+  }
+}
+
+@mixin tablet {
+  @media (max-width: $bp-tablet) {
+    @content;
+  }
+}
+
+@mixin desktop {
+  @media (min-width: $bp-desktop) {
+    @content;
+  }
+}
+
+@mixin large-desktop {
+  @media (min-width: $bp-large-desktop) {
+    @content;
+  }
+}
+
+// 区间断点
+@mixin small-up {
+  @media (min-width: $bp-small) {
+    @content;
+  }
+}
+
+@mixin tablet-only {
+  @media (min-width: $bp-tablet) and (max-width: ($bp-desktop - 1px)) {
+    @content;
+  }
+}
+
+// 防御性样式（应对文字溢出）
+@mixin text-ellipsis {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  max-width: 100%;
+}
+
+@mixin text-clamp($lines: 2) {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: $lines;
+  line-clamp: $lines;
+  overflow: hidden;
+}
+
+@mixin flex-shrink-container {
+  min-width: 0;
+  overflow: hidden;
+}

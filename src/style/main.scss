@@ -163,9 +163,6 @@ audio {
 
 // slider
 .n-slider {
-  // .n-slider-rail {
-  //   backdrop-filter: blur(10px);
-  // }
   .n-slider-handle {
     transition:
       opacity 0.3s var(--n-bezier),
@@ -183,9 +180,6 @@ audio {
   border-radius: 8px !important;
   backdrop-filter: blur(20px);
   overflow: hidden;
-  // &:not(.n-popover--raw) {
-  //   color: var(--primary-hex);
-  // }
 }
 
 // layout-toggle-bar
@@ -280,43 +274,10 @@ audio {
   border: 1px solid rgba(var(--primary), 0.28);
 }
 
-// select
-// .n-select {
-//   .n-base-selection {
-//     .n-base-selection-label {
-//       background-color: var(--n-border-color);
-//     }
-//   }
-// }
-
 // alert
 .n-alert {
   --n-border-radius: 8px !important;
 }
-
-// tag
-// .n-tag {
-//   font-size: 13px;
-//   padding: 0 16px;
-//   line-height: 0;
-//   cursor: pointer;
-//   transition:
-//     transform 0.3s,
-//     background-color 0.3s,
-//     color 0.3s;
-//   background-color: rgba(var(--primary), 0.08);
-//   &.choose {
-//     background-color: rgba(var(--primary), 0.28);
-//     color: var(--primary-hex);
-//   }
-//   &:hover {
-//     background-color: rgba(var(--primary), 0.28);
-//     color: var(--primary-hex);
-//   }
-//   &:active {
-//     transform: scale(0.98);
-//   }
-// }
 
 // .n-badge
 .n-badge {

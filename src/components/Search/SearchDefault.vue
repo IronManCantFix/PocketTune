@@ -1,6 +1,6 @@
 <template>
   <Transition name="fadeDown" mode="out-in" @before-enter="getSearchHotData">
-    <n-card v-if="isShow" class="search-default" content-style="padding: 0">
+    <div v-if="isShow" class="search-default">
       <n-scrollbar class="scrollbar">
         <!-- 搜索历史 -->
         <div v-if="isShowSearchHistory" class="history">
@@ -56,7 +56,7 @@
           </div>
         </div>
       </n-scrollbar>
-    </n-card>
+    </div>
   </Transition>
 </template>
 
@@ -137,9 +137,12 @@ onMounted(() => {
   position: absolute;
   left: 0;
   top: 50px;
-  width: 300px;
+  width: clamp(280px, 28vw, 320px);
+  max-width: calc(100vw - 32px);
   border-radius: 8px;
   z-index: 101;
+  overflow: hidden;
+  background-color: var(--n-color, #fff);
   &.fadeDown-enter-to {
     transition-delay: 0.25s;
   }
@@ -150,7 +153,11 @@ onMounted(() => {
     }
   }
   @media (max-width: 768px) {
-    width: 100%;
+    width: calc(100vw - 32px);
+    // 移动端限制面板高度为视口高度的 2/3，避免热门榜过长
+    :deep(.scrollbar) {
+      max-height: calc(100dvh * 2 / 3);
+    }
   }
   .title {
     display: flex;

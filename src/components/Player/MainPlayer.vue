@@ -142,7 +142,7 @@
     <n-flex :size="8" align="center" justify="center" class="play-control">
       <!-- 随机按钮 -->
       <template v-if="musicStore.playSong.type !== 'radio' && !statusStore.personalFmMode">
-        <div class="play-icon" @click.stop="player.toggleShuffle()">
+        <div class="play-icon mode-btn" @click.stop="player.toggleShuffle()">
           <SvgIcon
             :name="statusStore.shuffleIcon"
             :size="20"
@@ -195,7 +195,7 @@
       </div>
       <!-- 循环按钮 -->
       <template v-if="musicStore.playSong.type !== 'radio' && !statusStore.personalFmMode">
-        <div class="play-icon" @click.stop="player.toggleRepeat()">
+        <div class="play-icon mode-btn" @click.stop="player.toggleRepeat()">
           <SvgIcon
             :name="statusStore.repeatIcon"
             :size="20"
@@ -287,10 +287,20 @@ const sourceTag = computed(() => {
   return audioSourceLabel(source);
 });
 
-// 触摸滑动切换歌曲
+// 触摸滑动切换歌曲（排除进度条区域，避免手势冲突）
+const isOnSlider = ref(false);
 const { direction } = useSwipe(playerRef, {
   threshold: 50,
+  onSwipeStart: (e: TouchEvent) => {
+    // 检查触摸起点是否在进度条上，避免与拖拽进度条冲突
+    const target = e.target as HTMLElement;
+    isOnSlider.value = !!target.closest(".player-slider") || !!target.closest(".n-slider");
+  },
   onSwipeEnd: () => {
+    if (isOnSlider.value) {
+      isOnSlider.value = false;
+      return;
+    }
     if (direction.value === "left") {
       // 左滑
       player.nextOrPrev("next");
@@ -447,7 +457,7 @@ const showCreatorTip = () => window.$message.info("暂不支持查看主播主�
 .main-player {
   position: fixed;
   left: 0;
-  bottom: -90px;
+  bottom: calc(-80px - env(safe-area-inset-bottom, 0px));
   // 高度包含 iPhone 底部安全区，背景铺满避免底部露出白线
   height: calc(80px + env(safe-area-inset-bottom, 0px));
   padding: 0 15px;
@@ -538,6 +548,7 @@ const showCreatorTip = () => window.$message.info("暂不支持查看主播主�
         display: flex;
         align-items: center;
         min-width: 0;
+        overflow: hidden;
         .name {
           font-weight: bold;
           font-size: 16px;
@@ -546,6 +557,7 @@ const showCreatorTip = () => window.$message.info("暂不支持查看主播主�
           min-width: 0;
           max-width: 100%;
           transition: color 0.3s;
+          overflow: hidden;
         }
         .n-tag {
           margin-left: 8px;
@@ -711,6 +723,20 @@ const showCreatorTip = () => window.$message.info("暂不支持查看主播主�
       }
     }
   }
+  @media (max-width: 990px) {
+    .play-data {
+      .info {
+        .data {
+          .name {
+            font-size: 15px;
+          }
+        }
+      }
+    }
+    .play-menu {
+      max-width: 100%;
+    }
+  }
   @media (max-width: 810px) {
     grid-template-columns: 1fr auto auto;
     padding: 0 8px;
@@ -721,12 +747,13 @@ const showCreatorTip = () => window.$message.info("暂不支持查看主播主�
         --n-width: 40px;
         --n-height: 40px;
       }
-      .play-icon {
+      .mode-btn {
         display: none;
       }
     }
     .play-data {
       padding-left: 60px;
+      max-width: 100%;
       .cover {
         width: 50px;
         height: 50px;
@@ -750,6 +777,9 @@ const showCreatorTip = () => window.$message.info("暂不支持查看主播主�
           }
         }
       }
+    }
+    .play-menu {
+      max-width: 220px;
     }
   }
   @media (max-width: 512px) {

@@ -578,7 +578,7 @@ onBeforeUnmount(() => {
     align-items: center;
     justify-content: space-between;
     padding: 8px 12px;
-    // margin-right: 4px;
+    // 间距与 SongCard 行内容保持一致，确保表头对齐
     border: 1px solid transparent;
     // background-color: var(--background-hex);
     .n-text {
@@ -591,18 +591,24 @@ onBeforeUnmount(() => {
       align-items: center;
       width: 40px;
       min-width: 40px;
+      flex-shrink: 0;
       font-weight: bold;
       margin-right: 12px;
     }
     .title {
       position: relative;
-      flex: 1;
+      flex: 1 1 0;
+      min-width: 0;
       display: flex;
       align-items: center;
       padding: 4px 20px 4px 0;
       cursor: pointer;
+      overflow: hidden;
       .sort {
         margin-left: 6px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
         &::after {
           content: " )";
         }
@@ -631,23 +637,46 @@ onBeforeUnmount(() => {
       }
     }
     .album {
-      flex: 1;
+      flex: 1 1 0;
+      min-width: 0;
       padding-right: 20px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
     .actions {
       display: flex;
       align-items: center;
       justify-content: center;
       width: 40px;
+      flex-shrink: 0;
     }
     .meta {
       width: 50px;
+      flex-shrink: 0;
       text-align: center;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
       &.size {
         width: 60px;
       }
       &.date {
         width: 80px;
+      }
+    }
+    @include small-screen {
+      .meta.size {
+        display: none;
+      }
+    }
+    // 与 SongCard 行内容小屏样式保持一致，确保表头对齐
+    @include small {
+      .actions {
+        width: 32px;
+      }
+      .meta.date {
+        display: none;
       }
     }
   }
@@ -772,7 +801,7 @@ onBeforeUnmount(() => {
   z-index: 9999;
   padding: 8px 16px;
   border-radius: 20px;
-  background-color: rgba(var(--primary), 0.15);
+  background-color: rgba(var(--primary), 0.18);
   backdrop-filter: blur(8px);
   pointer-events: none;
   transform: translate(12px, 12px);
@@ -783,7 +812,12 @@ onBeforeUnmount(() => {
   text-overflow: ellipsis;
   font-size: 14px;
   font-weight: 500;
-  color: rgba(var(--text-color), 0.3);
+  color: rgb(var(--text-color));
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+
+  .drag-label-name {
+    color: inherit;
+  }
 }
 
 .sort-menu {

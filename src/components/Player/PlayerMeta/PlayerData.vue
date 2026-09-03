@@ -191,11 +191,12 @@ const lyricSourceOptions = computed(() => {
   return options;
 });
 
-// 左侧外边距
+// 左侧外边距（限制最小值为 0，防止负值溢出）
 const leftMargin = computed(() => {
   if (props.center || !props.light) return "0px";
   const offset = settingStore.lyricHorizontalOffset;
-  return settingStore.useAMLyrics ? `${offset + 40}px` : `${offset + 10}px`;
+  const margin = settingStore.useAMLyrics ? offset + 40 : offset + 10;
+  return `${Math.max(0, margin)}px`;
 });
 
 /** 音频源选项 */
@@ -282,7 +283,6 @@ const jumpToRadio = debounce(
   max-width: 50vh;
   margin-top: 24px;
   padding: 0 2px;
-  // mix-blend-mode: plus-lighter;
   .n-icon {
     color: rgb(var(--main-cover-color));
   }
@@ -390,6 +390,7 @@ const jumpToRadio = debounce(
     .name {
       .name-text {
         font-size: 30px;
+        @include text-ellipsis;
       }
       .extra-info {
         position: absolute;
@@ -399,8 +400,11 @@ const jumpToRadio = debounce(
         justify-content: center;
       }
     }
-    @media (max-width: 990px) {
-      padding: 0 2px;
+    @media (max-width: 1200px) {
+      padding: 0 40px;
+    }
+    @include tablet {
+      padding: 0 8px;
     }
   }
   &.center {

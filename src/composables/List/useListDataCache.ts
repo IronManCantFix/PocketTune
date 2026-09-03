@@ -74,9 +74,8 @@ export const useListDataCache = () => {
 
     try {
       await listCacheDB.setItem(key, cacheData);
-      console.log(`✅ List cache saved: ${key}`);
     } catch (error) {
-      console.error(`❌ Failed to save list cache: ${key}`, error);
+      console.error(`Failed to save list cache: ${key}`, error);
     }
   };
 
@@ -97,15 +96,13 @@ export const useListDataCache = () => {
 
       // 检查版本
       if (cacheData.version !== CACHE_VERSION) {
-        console.log(`⚠️ Cache version mismatch: ${key}, removing old cache`);
         await removeCache(type, id);
         return null;
       }
 
-      console.log(`✅ List cache loaded: ${key}`);
       return cacheData;
     } catch (error) {
-      console.error(`❌ Failed to load list cache: ${key}`, error);
+      console.error(`Failed to load list cache: ${key}`, error);
       return null;
     }
   };
@@ -120,30 +117,11 @@ export const useListDataCache = () => {
   const checkNeedsUpdate = (cached: ListCacheData, latestDetail: CoverType): boolean => {
     // 如果有 updateTime，则比较
     if (cached.detail.updateTime && latestDetail.updateTime) {
-      const needsUpdate = cached.detail.updateTime !== latestDetail.updateTime;
-      if (needsUpdate) {
-        console.log(`🔄 Cache needs update: timestamp changed`);
-        console.log(`   Old: ${cached.detail.updateTime}`);
-        console.log(`   New: ${latestDetail.updateTime}`);
-      } else {
-        console.log(`✅ Cache is up to date (timestamp match)`);
-      }
-      return needsUpdate;
+      return cached.detail.updateTime !== latestDetail.updateTime;
     }
 
     // 如果没有 updateTime，比较 count
-    if (cached.detail.count !== latestDetail.count) {
-      console.log(`🔄 Cache needs update: count changed`);
-      return true;
-    }
-
-    if (cached.type === "album") {
-      console.log(`✅ Album cache is up to date (count match)`);
-    } else {
-      console.log(`⚠️ No timestamp found, assuming up to date based on count`);
-    }
-
-    return false;
+    return cached.detail.count !== latestDetail.count;
   };
 
   /**
@@ -156,9 +134,8 @@ export const useListDataCache = () => {
 
     try {
       await listCacheDB.removeItem(key);
-      console.log(`🗑️ List cache removed: ${key}`);
     } catch (error) {
-      console.error(`❌ Failed to remove list cache: ${key}`, error);
+      console.error(`Failed to remove list cache: ${key}`, error);
     }
   };
 
@@ -168,9 +145,8 @@ export const useListDataCache = () => {
   const clearAllCache = async (): Promise<void> => {
     try {
       await listCacheDB.clear();
-      console.log(`🗑️ All list cache cleared`);
     } catch (error) {
-      console.error(`❌ Failed to clear list cache`, error);
+      console.error(`Failed to clear list cache`, error);
     }
   };
 

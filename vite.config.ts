@@ -49,6 +49,7 @@ export default defineConfig(({ mode }) => {
     css: {
       preprocessorOptions: {
         scss: {
+          additionalData: `@use "@/style/breakpoints.scss" as *;\n`,
           silenceDeprecations: ["legacy-js-api"],
         },
       },

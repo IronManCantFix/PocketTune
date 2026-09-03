@@ -36,22 +36,26 @@ const statusStore = useStatusStore();
     padding: 0 1rem;
     transition: transform 0.3s;
     cursor: pointer;
+    min-width: 0;
+    overflow: hidden;
     .n-text {
-      width: 90px;
+      max-width: 140px;
       font-size: 22px;
       font-family: "logo";
       margin-left: 8px;
       margin-top: 2px;
       line-height: 40px;
       overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
       transition:
-        width 0.3s,
+        max-width 0.3s,
         opacity 0.3s,
         margin 0.3s;
     }
     &.collapsed {
       .n-text {
-        width: 0;
+        max-width: 0;
         opacity: 0;
         margin-left: 0;
       }

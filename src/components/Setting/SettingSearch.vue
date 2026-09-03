@@ -25,6 +25,7 @@
             :key="item.value"
             class="result-item"
             @mousedown.prevent="handleSelect(item.value!)"
+            @touchstart.prevent="handleSelect(item.value!)"
           >
             <div class="group-label" v-if="item.groupLabel">{{ item.groupLabel }}</div>
             <div class="label">{{ item.label }}</div>

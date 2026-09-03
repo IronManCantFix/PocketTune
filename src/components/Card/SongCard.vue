@@ -311,6 +311,7 @@ const albumName = computed(() => {
     align-items: center;
     width: 40px;
     min-width: 40px;
+    flex-shrink: 0;
     font-weight: bold;
     margin-right: 12px;
     .n-icon {
@@ -340,10 +341,12 @@ const albumName = computed(() => {
     display: flex;
     align-items: center;
     padding: 4px 20px 4px 0;
+    overflow: hidden;
     .cover {
       width: 50px;
       height: 50px;
       min-width: 50px;
+      flex-shrink: 0;
       border-radius: 8px;
       margin-right: 12px;
       display: flex;
@@ -357,8 +360,24 @@ const albumName = computed(() => {
         display: flex;
         flex-direction: row;
         align-items: center;
+        min-width: 0;
+        max-width: 100%;
+        overflow: hidden;
         line-height: normal;
         font-size: 16px;
+        :deep(.n-ellipsis) {
+          min-width: 0;
+          max-width: 100%;
+        }
+        .alia {
+          margin-left: 4px;
+          min-width: 0;
+          max-width: 60%;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          flex-shrink: 1;
+        }
       }
       .desc {
         min-width: 0;
@@ -367,6 +386,7 @@ const albumName = computed(() => {
         flex-wrap: wrap;
         row-gap: 4px;
         max-width: 100%;
+        overflow: hidden;
         .n-tag {
           --n-height: 18px;
           font-size: 10px;
@@ -398,11 +418,9 @@ const albumName = computed(() => {
         }
       }
       .artists {
-        max-width: 100%;
-      }
-      .artists {
         flex: 1;
         min-width: 0;
+        max-width: 100%;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
@@ -442,6 +460,15 @@ const albumName = computed(() => {
     line-clamp: 2;
     -webkit-line-clamp: 2;
     padding-right: 20px;
+    overflow: hidden;
+    .album-text {
+      display: -webkit-box;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 2;
+      line-clamp: 2;
+      overflow: hidden;
+      word-break: break-word;
+    }
     &:hover {
       .album-text {
         color: var(--primary-hex);
@@ -453,6 +480,7 @@ const albumName = computed(() => {
     align-items: center;
     justify-content: center;
     width: 40px;
+    flex-shrink: 0;
     .n-icon {
       color: var(--primary-hex);
       transition: transform 0.3s;
@@ -467,6 +495,7 @@ const albumName = computed(() => {
   }
   .meta {
     width: 50px;
+    flex-shrink: 0;
     font-size: 13px;
     text-align: center;
     &.size {

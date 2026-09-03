@@ -544,13 +544,22 @@ watch(
   display: flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
   .n-text {
     font-size: 0.93em;
+    min-width: 0;
+    flex: 1 1 auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   .n-button {
     --n-height: 22px;
     --n-padding: 0 12px;
     --n-icon-size: 12px;
+    flex-shrink: 0;
   }
 }
 .pl-cover {

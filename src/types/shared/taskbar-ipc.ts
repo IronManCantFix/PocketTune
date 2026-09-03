@@ -102,8 +102,8 @@ export interface TaskbarLayoutPayload {
   anchor: "left" | "right";
 }
 
-/** 默认任务栏歌词设置 */
-export const DEFAULT_TASKBAR_LYRIC_SETTINGS: TaskbarLyricSettings = {
+/** 默认任务栏歌词设置（冻结防止意外 mutation） */
+export const DEFAULT_TASKBAR_LYRIC_SETTINGS: TaskbarLyricSettings = Object.freeze({
   position: "auto",
   autoMaxWidth: true,
   maxWidth: 400,
@@ -114,7 +114,7 @@ export const DEFAULT_TASKBAR_LYRIC_SETTINGS: TaskbarLyricSettings = {
   wordByWord: true,
   fontSize: 14,
   fontFamily: "",
-};
+});
 
 export const TASKBAR_IPC_CHANNELS = {
   /**

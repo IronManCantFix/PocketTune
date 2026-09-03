@@ -1,6 +1,7 @@
 import type { SongType } from "@/types/main";
 import { fuzzySearch } from "@/utils/helper";
 import { debounce } from "lodash-es";
+import { onUnmounted, ref, type Ref } from "vue";
 
 /**
  * 列表搜索逻辑
@@ -29,6 +30,11 @@ export const useListSearch = (listData: Ref<SongType[]>) => {
     const result = fuzzySearch(val, listData.value);
     searchData.value = result;
   }, 300);
+
+  // 组件卸载时取消未执行的搜索
+  onUnmounted(() => {
+    performSearch.cancel();
+  });
 
   /**
    * 获取显示的数据

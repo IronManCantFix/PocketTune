@@ -261,12 +261,11 @@ onBeforeMount(() => {
 .user {
   display: flex;
   align-items: center;
-  height: 34px;
+  height: 38px;
   border-radius: 25px;
   background-color: rgba(var(--primary), 0.08);
   transition: background-color 0.3s;
   cursor: pointer;
-  -webkit-app-region: no-drag;
   .avatar {
     display: flex;
     align-items: center;

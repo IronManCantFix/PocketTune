@@ -381,6 +381,23 @@ const activeActions = computed(() => {
   align-items: center;
   justify-content: space-between;
   padding: 16px;
+  gap: 12px;
+}
+
+.label {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-width: 0;
+  padding-right: 20px;
+
+  .name {
+    font-size: 16px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+  }
 }
 
 .control-wrapper {
@@ -389,12 +406,14 @@ const activeActions = computed(() => {
   gap: 12px;
   justify-content: flex-end;
   flex: 1;
+  min-width: 0;
 }
 
 .set {
   justify-content: flex-end;
   min-width: 200px;
   width: 200px;
+  flex-shrink: 0;
 
   &.n-switch {
     width: max-content;
@@ -404,6 +423,28 @@ const activeActions = computed(() => {
   @media (max-width: 768px) {
     width: 140px;
     min-width: 140px;
+  }
+}
+
+/* 极小屏幕纵向布局 */
+@media (max-width: 480px) {
+  :deep(.n-card__content) {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .label {
+    padding-right: 0;
+  }
+
+  .control-wrapper {
+    justify-content: flex-start;
+  }
+
+  .set {
+    width: 100%;
+    min-width: 0;
   }
 }
 </style>

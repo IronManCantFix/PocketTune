@@ -7,6 +7,9 @@ import type { AudioAnalysis, AutomixPlan, AutomixState } from "@/types/audio/aut
 import type { SongType } from "@/types/main";
 import { msToTime } from "@/utils/time";
 
+/** 日志时间戳映射最大条目数，防止无限增长 */
+const MAX_LOG_TIMESTAMPS = 100;
+
 /**
  * 自动混音（Automix）管理器
  * 职责：独立负责自动混音的预分析、智能调度、BPM对齐与无缝切歌逻辑
@@ -188,6 +191,14 @@ export class AutomixManager {
     const lastAt = this.automixLogTimestamps.get(scopedKey) ?? 0;
     if (intervalMs > 0 && now - lastAt < intervalMs) return;
     this.automixLogTimestamps.set(scopedKey, now);
+    // 清理过期条目，只保留最近 N 条
+    if (this.automixLogTimestamps.size > MAX_LOG_TIMESTAMPS) {
+      const entries = [...this.automixLogTimestamps.entries()];
+      const toDelete = entries.slice(0, entries.length - MAX_LOG_TIMESTAMPS);
+      for (const [key] of toDelete) {
+        this.automixLogTimestamps.delete(key);
+      }
+    }
     if (level === "warn") {
       if (detail === undefined) console.warn(message);
       else console.warn(message, detail);
@@ -301,14 +312,12 @@ export class AutomixManager {
       return;
     }
 
-    if (this.automixState === "MONITORING") {
-      if (timeLeft <= 45) {
-        this.maybeScheduleAutomix(rawTime);
-      }
-    } else if (this.automixState === "SCHEDULED") {
-      if (timeLeft <= 45) {
-        this.maybeScheduleAutomix(rawTime);
-      }
+    // MONITORING 和 SCHEDULED 状态下逻辑一致：剩余时间 <= 45s 时尝试调度
+    if (
+      (this.automixState === "MONITORING" || this.automixState === "SCHEDULED") &&
+      timeLeft <= 45
+    ) {
+      this.maybeScheduleAutomix(rawTime);
     }
   }
 

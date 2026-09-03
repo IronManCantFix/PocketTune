@@ -1,6 +1,6 @@
 <template>
   <n-flex align="center" size="large" vertical>
-    <n-flex align="center" justify="center">
+    <n-flex align="center" justify="center" wrap>
       <n-tag
         v-for="(item, index) in [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2]"
         :type="statusStore.playRate === item ? 'primary' : 'default'"

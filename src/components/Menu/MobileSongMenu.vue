@@ -4,7 +4,7 @@
     :auto-focus="false"
     placement="bottom"
     class="mobile-song-menu"
-    height="50vh"
+    height="auto"
   >
     <n-drawer-content
       :native-scrollbar="false"
@@ -84,6 +84,7 @@ defineExpose({ open });
 .mobile-song-menu {
   border-radius: 16px 16px 0 0;
   overflow: hidden;
+  max-height: 80vh;
   .menu-header {
     display: flex;
     align-items: center;

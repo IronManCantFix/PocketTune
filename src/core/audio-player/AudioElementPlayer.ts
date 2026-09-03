@@ -38,9 +38,7 @@ export class AudioElementPlayer extends BaseAudioPlayer {
     this.audioElement.crossOrigin = "anonymous";
     this.bindInternalEvents();
 
-    this.audioElement.addEventListener("seeked", () => {
-      this.isInternalSeeking = false;
-    });
+    this.audioElement.addEventListener("seeked", this._seekedHandler);
   }
 
   /**
@@ -243,8 +241,9 @@ export class AudioElementPlayer extends BaseAudioPlayer {
   private bindInternalEvents() {
     const events: AudioEventType[] = Object.values(AUDIO_EVENTS);
 
-    events.forEach((eventType) => {
-      this.audioElement.addEventListener(eventType, (e) => {
+    // 保存 handler 引用以便后续移除
+    this._eventHandlers = events.map((eventType) => {
+      const handler = (e: Event) => {
         if (eventType === AUDIO_EVENTS.ERROR) {
           this.dispatch(AUDIO_EVENTS.ERROR, {
             originalEvent: e,
@@ -253,7 +252,31 @@ export class AudioElementPlayer extends BaseAudioPlayer {
         } else {
           this.dispatch(eventType);
         }
-      });
+      };
+      this.audioElement.addEventListener(eventType, handler);
+      return { eventType, handler };
     });
   }
+
+  /** 保存的事件处理器引用，用于销毁时清理 */
+  private _eventHandlers: { eventType: AudioEventType; handler: EventListener }[] = [];
+
+  /** 销毁引擎，释放资源 */
+  public override destroy(): void {
+    // 清理事件监听器
+    if (this._eventHandlers.length > 0) {
+      this._eventHandlers.forEach(({ eventType, handler }) => {
+        this.audioElement.removeEventListener(eventType, handler);
+      });
+      this._eventHandlers = [];
+    }
+    // 清理 seeked 事件
+    this.audioElement.removeEventListener("seeked", this._seekedHandler);
+    super.destroy();
+  }
+
+  /** seeked 事件处理器 */
+  private _seekedHandler = () => {
+    this.isInternalSeeking = false;
+  };
 }

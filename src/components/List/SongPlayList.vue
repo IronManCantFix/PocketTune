@@ -303,8 +303,9 @@ const {
       justify-content: center;
       width: 30px;
       height: 100%;
+      flex-shrink: 0;
       cursor: grab;
-      color: rgba(var(--text-color), 0.3);
+      color: rgba(var(--text-color), 0.5);
       transition: color 0.3s;
       margin-right: 4px;
 
@@ -321,6 +322,7 @@ const {
       justify-content: center;
       width: 36px;
       min-width: 36px;
+      flex-shrink: 0;
       margin-right: 8px;
       .num {
         &.big {
@@ -330,22 +332,32 @@ const {
     }
     .data {
       flex: 1;
+      min-width: 0;
       display: flex;
       flex-direction: column;
       justify-content: center;
       width: 100%;
       height: 100%;
       padding: 8px 0;
-      .artists {
-        display: -webkit-box;
-        line-clamp: 1;
-        -webkit-box-orient: vertical;
-        -webkit-line-clamp: 1;
+      overflow: hidden;
+      .name {
         overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .artists {
+        // 单行显示，超宽时省略号截断（与 SongCard 写法一致）
+        min-width: 0;
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
         word-break: break-all;
         .ar {
           font-size: 12px;
-          display: inline-flex;
+          display: inline;
+          transition: opacity 0.3s;
+          opacity: 0.6;
           &::after {
             content: "/";
             margin: 0 4px;
@@ -363,6 +375,7 @@ const {
       align-items: center;
       justify-content: center;
       padding: 8px;
+      flex-shrink: 0;
       border-radius: 8px;
       transition: background-color 0.3s;
       cursor: pointer;
@@ -392,7 +405,7 @@ const {
   z-index: 9999;
   padding: 8px 16px;
   border-radius: 20px;
-  background-color: rgba(var(--primary), 0.15);
+  background-color: rgba(var(--primary), 0.18);
   backdrop-filter: blur(8px);
   pointer-events: none;
   transform: translate(12px, 12px);
@@ -403,7 +416,12 @@ const {
   text-overflow: ellipsis;
   font-size: 14px;
   font-weight: 500;
-  color: rgba(var(--text-color), 0.3);
+  color: rgb(var(--text-color));
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+
+  .drag-label-name {
+    color: inherit;
+  }
 
   &.full-player-drag-label {
     background-color: rgba(255, 255, 255, 0.2);

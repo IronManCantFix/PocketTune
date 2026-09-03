@@ -191,7 +191,7 @@ onMounted(() => {
   top: 0;
   left: 0;
   width: 100vw;
-  height: 100vh;
+  height: 100dvh;
   z-index: -1;
   pointer-events: none;
   overflow: hidden;
@@ -226,8 +226,8 @@ onMounted(() => {
     background-color: rgba(var(--background));
   }
   #main-content {
-    // 顶部预留导航高度，与导航栏同高，避免顶部出现空隙
-    top: 70px;
+    // 顶部预留导航高度（含安全区），与导航栏同高，避免顶部出现空隙
+    top: calc(70px + env(safe-area-inset-top, 0px));
     background-color: transparent;
     transition: bottom 0.3s;
     .router-view {

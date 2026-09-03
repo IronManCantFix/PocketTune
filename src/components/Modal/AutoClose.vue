@@ -19,7 +19,7 @@
       </n-flex>
     </n-card>
     <!-- 时间选择 -->
-    <n-flex size="large" align="center" justify="center">
+    <n-flex size="large" align="center" justify="center" wrap>
       <n-tag
         v-for="(item, index) in [10, 20, 30, 45, 60, 90, 120]"
         :bordered="false"

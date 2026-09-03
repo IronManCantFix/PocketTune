@@ -131,12 +131,24 @@ onBeforeMount(() => {
   }
   .other {
     margin: 20px 0;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
     .n-button {
-      width: 140px;
+      min-width: 140px;
+      flex: 0 1 auto;
     }
   }
   .close {
     margin-bottom: 8px;
+  }
+  @media (max-width: 380px) {
+    .other .n-button {
+      min-width: 120px;
+      --n-padding: 0 12px;
+      font-size: 13px;
+    }
   }
 }
 </style>

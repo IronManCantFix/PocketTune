@@ -277,7 +277,6 @@ onMounted(() => {
 .player-comment {
   position: absolute;
   right: 0;
-  width: 60%;
   flex: 1;
   width: 100%;
   height: calc(100vh - 160px);
@@ -293,23 +292,37 @@ onMounted(() => {
     padding: 0 16px;
     border-radius: 12px;
     background-color: rgba(var(--main-cover-color), 0.08);
+    overflow: hidden;
     .cover-img {
       width: 60px;
       height: 60px;
+      flex-shrink: 0;
       border-radius: 12px;
       margin-right: 4px;
     }
-    .title {
-      font-size: 20px;
-      font-weight: bold;
-    }
-    .artist {
-      opacity: 0.8;
+    .song-info {
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      .title {
+        font-size: 20px;
+        font-weight: bold;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .artist {
+        opacity: 0.8;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
     }
     .actions {
       margin-left: auto;
       display: flex;
       gap: 12px;
+      flex-shrink: 0;
       .close {
         width: 40px;
         height: 40px;
@@ -319,6 +332,17 @@ onMounted(() => {
         cursor: pointer;
         &:hover {
           background-color: rgba(var(--main-cover-color), 0.29);
+        }
+      }
+    }
+  }
+  @media (max-width: 990px) {
+    .song-data {
+      margin: 0 16px 12px;
+      padding: 0 12px;
+      .song-info {
+        .title {
+          font-size: 18px;
         }
       }
     }
@@ -346,6 +370,11 @@ onMounted(() => {
     }
     .n-skeleton {
       background-color: rgba(var(--main-cover-color), 0.08);
+    }
+    @media (max-width: 990px) {
+      .n-scrollbar-content {
+        padding: 0 16px;
+      }
     }
   }
   .comment-list {

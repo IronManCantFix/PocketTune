@@ -115,4 +115,15 @@ const cleanHistory = () => {
     overflow: hidden;
   }
 }
+
+// 移动端适配
+@media (max-width: 768px) {
+  .history {
+    .title {
+      .keyword {
+        font-size: 24px;
+      }
+    }
+  }
+}
 </style>

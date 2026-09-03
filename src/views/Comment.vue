@@ -175,4 +175,28 @@ watch(
     }
   }
 }
+
+// 移动端适配
+@media (max-width: 768px) {
+  .comment-page {
+    .song-data {
+      height: auto;
+      min-height: 70px;
+      padding: 8px 12px;
+      .cover-img {
+        width: 48px;
+        height: 48px;
+      }
+      .title {
+        font-size: 16px;
+      }
+      .actions {
+        .close {
+          width: 44px;
+          height: 44px;
+        }
+      }
+    }
+  }
+}
 </style>

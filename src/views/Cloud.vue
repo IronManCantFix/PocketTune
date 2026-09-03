@@ -301,4 +301,29 @@ onMounted(getAllCloudMusic);
     max-height: calc((var(--layout-height) - 132) * 1px);
   }
 }
+
+// 移动端适配
+@media (max-width: 768px) {
+  .cloud {
+    .title {
+      flex-direction: column;
+      align-items: flex-start;
+      .keyword {
+        font-size: 24px;
+      }
+      .status {
+        margin-left: 0;
+        margin-top: 8px;
+      }
+    }
+    .menu {
+      .search {
+        width: 100px;
+        &.n-input--focus {
+          width: 150px;
+        }
+      }
+    }
+  }
+}
 </style>
