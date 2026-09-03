@@ -9,6 +9,37 @@ import NeteaseCloudMusicApi from "@neteasecloudmusicapienhanced/api";
 // 默认 AMLL TTML DB 服务器地址
 const defaultAMLLDbServer = "https://amlldb.bikonoo.com/ncm-lyrics/%s.ttml";
 
+// 解析 multipart 上传参数（云盘上传等场景）
+const parseMultipart = async (req: FastifyRequest): Promise<Record<string, unknown>> => {
+  const result: Record<string, unknown> = {};
+  const parts = req.parts();
+  for await (const part of parts) {
+    if (part.type === "file") {
+      // 文件字段：读取为内存 Buffer，并附带文件名与 MIME 类型
+      result[part.fieldname] = {
+        name: part.filename,
+        data: await part.toBuffer(),
+        mimetype: part.mimetype,
+      };
+    } else {
+      // 普通文本字段
+      result[part.fieldname] = part.value;
+    }
+  }
+  return result;
+};
+
+// 合并请求参数（query + body），multipart 时优先从上传解析文件字段
+const collectParams = async (req: FastifyRequest): Promise<Record<string, unknown>> => {
+  let body: Record<string, unknown> = {};
+  if (req.isMultipart()) {
+    body = await parseMultipart(req);
+  } else {
+    body = (req.body as Record<string, unknown>) || {};
+  }
+  return { ...(req.query as Record<string, unknown>), ...body };
+};
+
 // 初始化 NcmAPI
 export const initNcmAPI = async (fastify: FastifyInstance) => {
   // 预热配置
@@ -53,9 +84,10 @@ export const initNcmAPI = async (fastify: FastifyInstance) => {
     await ensureNcmConfig();
 
     try {
+      // 合并 query 与 body（multipart 时解析上传文件字段，供云盘上传等使用）
+      const params = await collectParams(req);
       const result = await neteaseApi({
-        ...(req.query as Record<string, unknown>),
-        ...(req.body as Record<string, unknown>),
+        ...params,
         cookie: req.cookies,
       });
       // 歌 URL 类路由做解灰后处理，其他路由零开销
