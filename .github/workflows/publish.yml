@@ -1,0 +1,112 @@
+# 手动发布：更新版本号 + 打 tag + 构建 Docker 镜像
+# 版本号可手动指定，留空则自动 递增 patch 版本
+# 全程使用 GITHUB_TOKEN，无需额外配置 PAT
+#
+# 用法：Actions 页 → Publish → Run workflow
+#   - version 留空：读取当前 version 并自动 patch+1（如 1.0.0 → 1.0.1）
+#   - version 填 1.0.5：直接使用指定版本号
+
+name: Publish
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "指定版本号（留空则自动 patch+1）"
+        required: false
+        default: ""
+
+jobs:
+  publish:
+    name: Version bump & build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v6
+        with:
+          # 需要历史以允许写回提交
+          fetch-depth: 0
+
+      - name: Determine new version
+        id: version
+        run: |
+          CURRENT=$(node -p "require('./package.json').version")
+          INPUT="${{ inputs.version }}"
+          if [ -n "$INPUT" ]; then
+            NEW="$INPUT"
+          else
+            # 自动递增 patch 版本：major.minor.patch → major.minor.patch+1
+            MAJOR="${CURRENT%%.*}"
+            REST="${CURRENT#*.}"
+            MINOR="${REST%%.*}"
+            PATCH="${REST#*.}"
+            NEW="$MAJOR.$MINOR.$((PATCH + 1))"
+          fi
+          echo "current=$CURRENT" >> "$GITHUB_OUTPUT"
+          echo "new=$NEW" >> "$GITHUB_OUTPUT"
+          echo "tag=v$NEW" >> "$GITHUB_OUTPUT"
+
+      - name: Update package.json version
+        run: |
+          node -e "
+            const fs = require('fs');
+            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+            pkg.version = '${{ steps.version.outputs.new }}';
+            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+          "
+
+      - name: Show updated version
+        run: |
+          echo "当前版本: ${{ steps.version.outputs.current }} -> ${{ steps.version.outputs.new }}"
+          grep '"version"' package.json
+
+      # 写回版本号并打 tag，使用 GITHUB_TOKEN 推送
+      # 说明：GITHUB_TOKEN 触发的 push 不会再次触发本 workflow，避免递归
+      - name: Commit and push version & tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json
+          git commit -m "chore(version): v${{ steps.version.outputs.new }}"
+          git tag "${{ steps.version.outputs.tag }}"
+          git push origin HEAD:${{ github.ref_name }}
+          git push origin "${{ steps.version.outputs.tag }}"
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # 镜像 tag 使用本次发布的新版本号（dispatch 下 semver 元数据取不到，直接显式指定）
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=sha,format=long
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: |
+            linux/amd64
+            linux/arm64
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}:${{ steps.version.outputs.new }}
+            ghcr.io/${{ github.repository }}:latest
+          labels: ${{ steps.meta.outputs.labels }}
