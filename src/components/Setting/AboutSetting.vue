@@ -13,7 +13,7 @@
           </n-a>
         </n-flex>
       </n-alert>
-      <n-card class="set-item">
+      <n-card class="about-item">
         <n-flex align="center" class="about">
           <SvgIcon name="SPlayer" size="26" />
           <n-text class="logo-name">PocketTune</n-text>
@@ -345,12 +345,31 @@ onMounted(() => {
 </script>
 
 <style lang="scss" scoped>
+// 品牌卡片：独立于通用 set-item，避免命中设置行的横向布局与 nowrap 规则
+.about-item {
+  width: 100%;
+  border-radius: 8px;
+  margin-bottom: 12px;
+  :deep(.n-card__content) {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 16px;
+  }
+}
 .about {
   .logo-name {
     font-size: 16px;
+    // 窄屏时收缩并省略，不换行不挤压图标与版本号
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   .n-tag {
     border-radius: 6px;
+    flex-shrink: 0;
   }
 }
 .link {

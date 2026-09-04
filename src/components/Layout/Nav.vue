@@ -53,7 +53,7 @@
       <n-drawer-content
         :body-content-style="{ padding: 0 }"
         :native-scrollbar="false"
-        :style="{ paddingTop: 'env(safe-area-inset-top, 0px)' }"
+        :style="{ paddingTop: '0px' }"
       >
         <template #header>
           <n-flex align="center" class="aside-logo">
@@ -134,10 +134,10 @@ const setSelect = (key: string) => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  // 固定高度，移动端搜索栏紧贴屏幕顶部，避免顶部出现空洞
-  height: calc(70px + env(safe-area-inset-top, 0px));
+  // 固定高度，移动端搜索栏紧贴屏幕顶部
+  height: 70px;
   padding: 0 1rem;
-  padding-top: env(safe-area-inset-top, 0px);
+  padding-top: 0;
   background-color: transparent;
   // 左侧控制区域宽度变量，供搜索框计算可用空间
   --nav-page-control-width: 180px;
