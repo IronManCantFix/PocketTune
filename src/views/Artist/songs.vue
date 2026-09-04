@@ -5,6 +5,9 @@
       :loading="loading"
       disableHeightTransition
       loadMore
+      :external="isSmallScreen"
+      :external-scroll-top="externalScrollTop"
+      :external-viewport-height="externalViewportHeight"
       @reachBottom="reachBottom"
       @scroll="emit('scroll', $event)"
     />
@@ -17,11 +20,18 @@ import { artistAllSongs } from "@/api/artist";
 import { songDetail } from "@/api/song";
 import { formatSongsList } from "@/utils/format";
 import { debounce } from "lodash-es";
+import { useMobile } from "@/composables/useMobile";
 import { usePlayerController } from "@/core/player/PlayerController";
 
 const props = defineProps<{
   id: number;
+  // 移动端整页滚动的滚动位置与视口高度（驱动外滚模式虚拟列表）
+  externalScrollTop?: number;
+  externalViewportHeight?: number;
 }>();
+
+// 移动端启用外滚模式（列表内容撑高，随歌手页整页滚动）
+const { isSmallScreen } = useMobile();
 
 const emit = defineEmits<{
   scroll: [e: Event];

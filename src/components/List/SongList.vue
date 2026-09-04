@@ -1,15 +1,19 @@
 <!-- 歌曲列表 - 虚拟列表 -->
 <template>
   <Transition name="fade">
-    <div v-if="!isEmpty(listData)" ref="songListRef" class="song-list">
+    <div
+      v-if="!isEmpty(listData)"
+      ref="songListRef"
+      :class="{ 'song-list': true, 'is-external': external }"
+    >
       <Transition name="fade">
         <div
           :key="listKey"
           :style="{
-            height: height === 'auto' ? 'auto' : `${height || songListHeight}px`,
+            height: external || height === 'auto' ? 'auto' : `${height || songListHeight}px`,
             transition: disableHeightTransition ? 'transform 0.3s, opacity 0.3s' : undefined,
           }"
-          class="virtual-list-wrapper"
+          :class="{ 'virtual-list-wrapper': true, 'is-external': external }"
         >
           <!-- 悬浮顶栏 -->
           <div class="list-header song-card sticky-header">
@@ -90,6 +94,9 @@
             :items="virtualListItems"
             :height="`calc(100% - 40px)`"
             :padding-bottom="80"
+            :external="external"
+            :external-scroll-top="externalScrollTop"
+            :external-viewport-height="externalViewportHeight"
             :class="{ 'is-dragging-global': isDragging && draggable }"
             @scroll="onScroll"
           >
@@ -161,6 +168,24 @@
         <Transition name="fade" mode="out-in">
           <div v-if="floatToolShow" class="list-menu">
             <n-float-button-group position="relative">
+              <!-- 云盘后台上传进度按钮 -->
+              <n-badge
+                v-if="showCloudUploadEntry && cloudUploadStore.tasks.length"
+                :value="cloudUploadStore.runningCount"
+                :show-zero="false"
+                :max="99"
+                :offset="[6, 2]"
+                class="upload-entry-badge"
+              >
+                <n-float-button
+                  width="42"
+                  title="查看后台上传进度"
+                  :class="{ active: cloudUploadStore.panelVisible }"
+                  @click="cloudUploadStore.togglePanel"
+                >
+                  <SvgIcon :size="22" name="Cloud" />
+                </n-float-button>
+              </n-badge>
               <n-float-button v-if="hasPlaySong >= 0" width="42" @click="scrollToCurrentSong">
                 <SvgIcon :size="22" name="Location" />
               </n-float-button>
@@ -198,7 +223,7 @@
 
 <script setup lang="ts">
 import { SongType, SortField, SortOrder } from "@/types/main";
-import { useMusicStore, useStatusStore, useSettingStore } from "@/stores";
+import { useMusicStore, useStatusStore, useSettingStore, useCloudUploadStore } from "@/stores";
 import { isEmpty } from "lodash-es";
 import { sortFieldOptions, sortOrderOptions } from "@/utils/meta";
 import { usePlayerController } from "@/core/player/PlayerController";
@@ -244,6 +269,14 @@ const props = withDefaults(
     disableHeightTransition?: boolean;
     /** 是否可拖拽排序 */
     draggable?: boolean;
+    /** 外滚模式：内容撑高由外层容器滚动 */
+    external?: boolean;
+    /** 外滚模式：外部滚动位置 */
+    externalScrollTop?: number;
+    /** 外滚模式：外部视口高度 */
+    externalViewportHeight?: number;
+    /** 是否显示云盘后台上传进度按钮 */
+    showCloudUploadEntry?: boolean;
   }>(),
   {
     type: "song",
@@ -251,6 +284,9 @@ const props = withDefaults(
     playListId: 0,
     isDailyRecommend: false,
     listVersion: 0,
+    external: false,
+    externalScrollTop: 0,
+    externalViewportHeight: 0,
   },
 );
 
@@ -268,6 +304,7 @@ const emit = defineEmits<{
 const musicStore = useMusicStore();
 const statusStore = useStatusStore();
 const settingStore = useSettingStore();
+const cloudUploadStore = useCloudUploadStore();
 const player = usePlayerController();
 const { isSmallScreen } = useMobile();
 
@@ -558,6 +595,13 @@ onBeforeUnmount(() => {
   height: 100%;
   border-radius: 12px 0 0 12px;
   overflow: hidden;
+  // 外滚模式：内容撑高由外层容器滚动
+  &.is-external {
+    height: auto;
+    overflow: visible;
+    // 与吸附顶栏同底色，消除滚动时圆角/边缘透出下方 item 的缝隙
+    background-color: rgba(var(--background));
+  }
   // 离场时脱离文档流，避免新旧内容同时存在时布局跳动
   &.fade-leave-active {
     position: absolute;
@@ -687,6 +731,10 @@ onBeforeUnmount(() => {
       height 0.3s,
       transform 0.3s,
       opacity 0.3s;
+    // 外滚模式：整体铺上与吸顶栏同色的背景，滚动时内容从任何边缘都不会透出缝隙
+    &.is-external {
+      background-color: rgba(var(--background));
+    }
     // 离场时脱离文档流，避免新旧列表同时存在时布局跳动
     &.fade-leave-active {
       position: absolute;
@@ -698,6 +746,12 @@ onBeforeUnmount(() => {
       position: sticky;
       top: 0;
       z-index: 10;
+      // 吸顶后提供不透明背景，避免内容从栏下滚过透出（与主题底色一致的灰底）
+      background-color: rgba(var(--background));
+      // 独立合成层：避免快速滚动时吸顶栏与列表内容合成不同步产生顶部缝隙
+      will-change: transform;
+      // 向上延伸同色背景，盖住吸顶后顶部可能出现的亚像素缝隙
+      box-shadow: 0 -2px 0 0 rgba(var(--background));
     }
   }
   // 加载更多
@@ -735,6 +789,13 @@ onBeforeUnmount(() => {
   bottom: 120px;
   z-index: 10;
   pointer-events: none;
+  // 上传进度角标容器：块级显示，与组内按钮同列同间距
+  .upload-entry-badge {
+    display: block;
+    .n-float-button {
+      pointer-events: auto;
+    }
+  }
   .n-float-button {
     height: 42px;
     border: 1px solid rgba(var(--primary), 0.28);
@@ -743,6 +804,10 @@ onBeforeUnmount(() => {
     &.hidden {
       opacity: 0;
       pointer-events: none;
+    }
+    &.active {
+      border-color: var(--primary-hex);
+      background-color: rgba(var(--primary), 0.28);
     }
   }
 }

@@ -74,6 +74,7 @@
         :data="listDataShow"
         :loading="loading"
         :doubleClickAction="searchData?.length ? 'add' : 'all'"
+        show-cloud-upload-entry
         @removeSong="handleRemoveSong"
       />
       <n-empty
@@ -87,6 +88,8 @@
         </template>
       </n-empty>
     </Transition>
+    <!-- 后台上传进度面板 -->
+    <CloudUploadPanel />
   </div>
 </template>
 
@@ -249,24 +252,12 @@ onMounted(getAllCloudMusic);
       .n-progress {
         --n-fill-color: var(--primary-hex);
         margin-left: 4px;
-        cursor: pointer;
         :deep(.n-progress-graph) {
           width: 80px;
         }
         .space {
           display: inline-block;
           font-size: 12px;
-          transform: translateX(-5px);
-          opacity: 0;
-          transition:
-            opacity 0.3s,
-            transform 0.3s;
-        }
-        &:hover {
-          .space {
-            opacity: 1;
-            transform: translateX(0);
-          }
         }
       }
     }

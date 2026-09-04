@@ -183,7 +183,8 @@ export const openBatchList = async (
     transformOrigin: "center",
     autoFocus: false,
     style: {
-      maxWidth: "70vw",
+      // 桌面端固定宽度，移动端按视口收缩，避免表格列挤压
+      width: "min(900px, calc(100vw - 32px))",
     },
     title: "批量操作",
     content: () => h(BatchList, { data, isLocal, playListId, isCloud, onSuccess }),

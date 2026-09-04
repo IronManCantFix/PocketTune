@@ -47,6 +47,114 @@
 
 如需关注移动端待优化问题，可参考 `docs/mobile-ui-text-overlap-issues.md` 问题清单。
 
+### 🆕 最近优化（v4.1.x）
+
+- **云盘功能增强**：
+  - 云盘支持**批量删除**歌曲，删除前二次确认，防止误删
+  - 云盘新增**本地歌曲上传**，可直接将本地音频文件上传至网易云云盘
+  - 修复云盘上传接口 `multipart` 文件未被解析导致 500 的问题（后端改用 `req.parts()` 解析 `songFile` 字段），并将单文件大小限制由 1MB 放宽至 200MB
+- **移动端体验重构**：
+  - 新增统一响应式断点系统（`src/style/breakpoints.scss`），各页面 / 组件的移动端布局统一适配
+  - 搜索栏交互优化：聚焦态全屏遮罩、点击外部自动恢复、移除圆角灰色描边，移动端搜索面板高度限制为 2/3 屏
+  - 顶部导航移除刘海屏安全区下探，搜索栏贴紧屏幕顶部
+  - 歌手详情页移动端滚动重构：头部固定不再随滚动收起，详情随列表滚动整体上滑滑出，列表铺满全高滚动，关于信息样式独立适配
+- **Docker 构建优化**：
+  - 镜像构建改用 `corepack` 固定 `pnpm` 版本（锁定 `packageManager` 声明的版本），避免 `npm install -g pnpm` 拉取最新版 standalone 二进制导致的身份校验问题
+
+### 🐳 Docker 部署（Fork 版）
+
+> 镜像由 GitHub Actions 的 **Publish** 工作流在云端构建并推送到 `ghcr.io`，本地**无需也不应**构建镜像。镜像内已包含网页端 `dist/` 产物、Fastify 后端与 UnblockNeteaseMusic 音源替换服务，默认监听 `25884` 端口。
+
+#### 镜像地址
+
+```bash
+ghcr.io/ironmancantfix/pockettune:latest   # 最新版
+ghcr.io/ironmancantfix/pockettune:4.1.1    # 指定版本（tag 为版本号，不带 v 前缀）
+```
+
+#### 方式一：docker run
+
+```bash
+# 拉取镜像
+docker pull ghcr.io/ironmancantfix/pockettune:latest
+
+# 运行容器
+docker run -d \
+  --name PocketTune \
+  -p 25884:25884 \
+  --restart always \
+  ghcr.io/ironmancantfix/pockettune:latest
+```
+
+启动成功后访问 [http://localhost:25884](http://localhost:25884/) 即可；如需更换端口，修改 `-p` 中冒号前的宿主机端口即可（容器内端口固定为 `25884`）。
+
+#### 方式二：docker compose
+
+在任意目录创建 `docker-compose.yml`（以下为纯拉取镜像的部署配置）：
+
+```yaml
+services:
+  PocketTune:
+    image: ghcr.io/ironmancantfix/pockettune:latest
+    container_name: PocketTune
+    ports:
+      - 25884:25884
+    restart: always
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+    environment:
+      # 所有变量均非必填，按需增删
+      # 网易云服务端 IP, 可在宿主机通过 ping music.163.com 获得
+      - NETEASE_SERVER_IP=220.197.30.65
+      # UnblockNeteaseMusic 使用的音源, 支持列表见 UnblockNeteaseMusic 官方 README
+      - UNBLOCK_SOURCES=kugou kuwo bilibili
+      # 可添加 UnblockNeteaseMusic 支持的任何环境变量
+      - ENABLE_FLAC=false
+      - ENABLE_HTTPDNS=false
+      - BLOCK_ADS=true
+      - FOLLOW_SOURCE_ORDER=true
+      - SELECT_MAX_BR=true
+      - LOG_LEVEL=info
+      - SEARCH_ALBUM=true
+```
+
+```bash
+docker compose up -d
+```
+
+> ⚠️ 注意：本仓库根目录自带的 `docker-compose.yml` 使用了 `build:` 字段与本地镜像标签 `image: splayer`，是**本地构建**用的配置，直接 `docker compose up` 会触发本地构建。仅拉取远程镜像部署时，请使用上方配置，或将 `image` 改为 `ghcr.io` 地址并移除 `build` 段。
+
+#### 环境变量说明
+
+| 变量                  | 默认值                | 说明                                                      |
+| --------------------- | --------------------- | --------------------------------------------------------- |
+| `NETEASE_SERVER_IP`   | `220.197.30.65`       | 网易云服务端 IP，可在宿主机通过 `ping music.163.com` 获得 |
+| `UNBLOCK_SOURCES`     | `kugou bodian pyncmd` | UnblockNeteaseMusic 使用的音源，多个以空格分隔            |
+| `ENABLE_FLAC`         | `false`               | 是否解锁无损 (FLAC) 音质                                  |
+| `SELECT_MAX_BR`       | `true`                | 自动选择最高可用音质                                      |
+| `FOLLOW_SOURCE_ORDER` | `true`                | 按音源列表顺序依次尝试                                    |
+| `BLOCK_ADS`           | `true`                | 屏蔽网易云广告                                            |
+| `LOG_LEVEL`           | `info`                | 后端日志级别                                              |
+
+> 全部变量均为可选项，支持透传 UnblockNeteaseMusic 的任何环境变量，完整列表见仓库 `docker-compose.yml` 内注释。
+
+#### 更新升级
+
+```bash
+docker compose pull && docker compose up -d
+# 或 docker run 方式：
+docker pull ghcr.io/ironmancantfix/pockettune:latest
+docker rm -f PocketTune
+# 再按上方的 docker run 命令重新启动
+```
+
+#### NAS / 面板部署注意事项
+
+- 在飞牛、1Panel、群晖等面板中「从镜像创建容器」时，默认容器名可能取镜像路径的第一段（例如 `ironmancantfix`），建议在创建表单中**手动指定容器名称**（如 `PocketTune`）；容器名不影响任何功能，仅用于标识，也可通过 `docker rename 旧名 PocketTune` 修改
+- 端口映射：容器内固定监听 `25884`，宿主机端口可按需映射（如 `8080:25884`）
+- 镜像支持 `linux/amd64` 与 `linux/arm64` 双架构，NAS 无论是 x86 还是 ARM 均可直接拉取使用
+
 ### ⚠️ 说明
 
 - 底部为**原项目 (SPlayer) 的 README**，内容未做改动，仅用于保留原始使用说明与文档
@@ -193,7 +301,9 @@
 
 ### 自行部署方案
 
-#### ⚙️ Docker 部署
+#### ⚙️ Docker 部署（原项目方案，仅作参考）
+
+> 本 Fork 的 Docker 部署请优先参见上文「🐳 Docker 部署（Fork 版）」，镜像由 GitHub Actions 云端构建。以下为原项目保留的本地构建说明，仅作参考。
 
 > 安装及配置 `Docker` 将不在此处说明，请自行解决
 

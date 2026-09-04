@@ -38,7 +38,7 @@
           </n-flex>
         </n-popover>
       </n-flex>
-      <n-flex class="menu">
+      <n-flex class="menu" wrap>
         <!-- 批量下载 -->
         <n-button
           v-if="statusStore.isDeveloperMode"
@@ -120,10 +120,12 @@ import { openDownloadSongs } from "@/utils/modal";
 import { deleteCloudSong } from "@/api/cloud";
 import { useDataStore } from "@/stores";
 import { usePlayerController } from "@/core/player/PlayerController";
+import { useMobile } from "@/composables/useMobile";
 
 const statusStore = useStatusStore();
 const dataStore = useDataStore();
 const player = usePlayerController();
+const { isSmallScreen } = useMobile();
 
 interface DataType {
   key?: number;
@@ -165,7 +167,7 @@ const columnsData = computed<DataTableColumns<DataType>>(() => [
   {
     title: "#",
     key: "key",
-    width: 80,
+    width: isSmallScreen.value ? 44 : 80,
   },
   {
     title: "标题",
@@ -173,6 +175,7 @@ const columnsData = computed<DataTableColumns<DataType>>(() => [
     ellipsis: {
       tooltip: true,
     },
+    minWidth: isSmallScreen.value ? 100 : 120,
   },
   {
     title: "歌手",
@@ -180,14 +183,21 @@ const columnsData = computed<DataTableColumns<DataType>>(() => [
     ellipsis: {
       tooltip: true,
     },
+    minWidth: isSmallScreen.value ? 70 : 100,
   },
-  {
-    title: "专辑",
-    key: "album",
-    ellipsis: {
-      tooltip: true,
-    },
-  },
+  // 小屏隐藏专辑列，避免列过多挤压文字
+  ...(isSmallScreen.value
+    ? []
+    : [
+        {
+          title: "专辑",
+          key: "album",
+          ellipsis: {
+            tooltip: true,
+          },
+          minWidth: 120,
+        },
+      ]),
 ]);
 
 // 表格数据
@@ -299,5 +309,24 @@ const handleBatchDeleteCloud = () => {
 }
 .range-input {
   width: 100px;
+}
+
+// 移动端适配
+@media (max-width: 767px) {
+  .batch-footer {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+
+    .menu {
+      flex-wrap: wrap;
+      gap: 8px;
+
+      .n-button {
+        flex: 1;
+        min-width: calc(50% - 4px);
+      }
+    }
+  }
 }
 </style>

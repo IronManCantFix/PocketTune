@@ -1,6 +1,33 @@
 <template>
-  <div ref="wrapperRef" class="virtual-scroll-wrapper" :style="{ height: containerHeightStyle }">
+  <div
+    ref="wrapperRef"
+    class="virtual-scroll-wrapper"
+    :class="{ 'is-external': external }"
+    :style="{ height: containerHeightStyle }"
+  >
+    <template v-if="external">
+      <!-- 外滚模式：内容撑高，可见窗口由外层滚动驱动 -->
+      <div ref="contentRef" class="virtual-list" :style="{ height: `${totalHeight}px` }">
+        <div
+          v-for="(item, index) in visibleItems"
+          :key="getItemKey(item, actualStartIndex + index)"
+          ref="itemRefs"
+          class="virtual-item"
+          :data-index="actualStartIndex + index"
+          :style="{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            transform: `translateY(${getItemTop(actualStartIndex + index)}px)`,
+          }"
+        >
+          <slot :item="item" :index="actualStartIndex + index" />
+        </div>
+      </div>
+    </template>
     <n-scrollbar
+      v-else
       ref="scrollbarRef"
       class="custom-virtual-list"
       style="height: 100%"
@@ -62,12 +89,21 @@ interface Props {
   defaultScrollIndex?: number;
   /** 获取唯一键的函数 */
   getItemKey?: (item: any, index: number) => string | number;
+  /** 外滚模式：内容撑高由外层容器滚动，滚动位置由外部传入 */
+  external?: boolean;
+  /** 外滚模式：外部滚动位置 */
+  externalScrollTop?: number;
+  /** 外滚模式：视口高度（用于计算可见范围） */
+  externalViewportHeight?: number;
 }
 
 const props = withDefaults(defineProps<Props>(), {
   itemFixed: false,
   bufferSize: 5,
   paddingBottom: 0,
+  external: false,
+  externalScrollTop: 0,
+  externalViewportHeight: 0,
   getItemKey: (item: any, index: number) => {
     return item?.key ?? item?.id ?? index;
   },
@@ -91,6 +127,14 @@ const itemRefs = ref<HTMLElement[]>([]);
 // 滚动位置
 const scrollTop = ref(0);
 
+// 外滚模式：列表顶部相对滚动容器的偏移（用于把外部滚动量换算成列表自身滚动量）
+const wrapperOffsetTop = ref(0);
+
+// 外滚模式：换算后的列表自身滚动量
+const effectiveExternalScrollTop = computed(() =>
+  Math.max(0, props.externalScrollTop - wrapperOffsetTop.value),
+);
+
 // 存储每个项目的实际高度
 const itemHeights = shallowRef<number[]>([]);
 // 存储每个项目的累积高度（用于定位）
@@ -103,11 +147,15 @@ const actualEndIndex = ref(0);
 
 // 容器高度样式
 const containerHeightStyle = computed(() => {
+  // 外滚模式：内容撑高，参与外层滚动
+  if (props.external) return `${totalHeight.value}px`;
   return typeof props.height === "number" ? `${props.height}px` : props.height;
 });
 
 // 实际使用的容器高度数值
 const viewportHeight = computed(() => {
+  // 外滚模式：使用外部传入的视口高度
+  if (props.external) return props.externalViewportHeight || 0;
   if (typeof props.height === "number") return props.height;
   return containerHeight.value || 0;
 });
@@ -337,6 +385,34 @@ const handleScroll = (event: Event) => {
   }
 };
 
+// 外滚模式：外部滚动位置驱动可见窗口
+watch(
+  () => props.externalScrollTop,
+  (top) => {
+    if (!props.external) return;
+    // 把外部滚动量换算成列表自身滚动量（减去列表顶部偏移）
+    const listTop = effectiveExternalScrollTop.value;
+    scrollTop.value = listTop;
+    calculateVisibleRange(listTop);
+    // 触底检测（用列表自身滚动量；滚动到外滚容器底部即视为触底）
+    if (
+      props.items.length &&
+      totalHeight.value - listTop - (props.externalViewportHeight || 0) <= 0
+    ) {
+      emit("reachBottom");
+    }
+  },
+);
+
+// 外滚模式：外部视口高度变化时重算可见窗口
+watch(
+  () => props.externalViewportHeight,
+  () => {
+    if (!props.external) return;
+    calculateVisibleRange(effectiveExternalScrollTop.value);
+  },
+);
+
 // 滚动到指定索引
 const scrollToIndex = (index: number, behavior: ScrollBehavior = "auto") => {
   if (props.items.length === 0) return;
@@ -360,6 +436,8 @@ const scrollToIndex = (index: number, behavior: ScrollBehavior = "auto") => {
 
 // 滚动到指定位置
 const scrollToPosition = (top: number, behavior: ScrollBehavior = "auto") => {
+  // 外滚模式：由外层容器滚动（对外抛出事件由父级接管）
+  if (props.external) return;
   scrollbarRef.value?.scrollTo({
     top,
     behavior,
@@ -377,6 +455,32 @@ const getItemTop = (index: number) => {
   }
   return itemTops.value[index] || 0;
 };
+
+// 外滚模式：测量列表顶部相对滚动容器的偏移，用于把外部滚动量换算成列表自身滚动量
+const measureWrapperOffset = () => {
+  const el = wrapperRef.value;
+  if (!el || !el.offsetParent) return;
+  // offsetParent 为最近定位祖先。在歌手页移动端布局中，滚动容器 .artist 为 position:relative，
+  // 是 virtual-list 的 offsetParent，故 offsetTop 即列表顶部相对滚动容器顶部的偏移。
+  wrapperOffsetTop.value = el.offsetTop;
+};
+
+// 外滚模式：外部滚动量传入即开始前，等待布局稳定后测量偏移
+watch(
+  () => props.external,
+  (val) => {
+    if (val) nextTick(() => nextTick(measureWrapperOffset));
+  },
+  { flush: "post" },
+);
+
+// 数据或头部变化后可能撑高，重新测量偏移
+watch(
+  () => props.items.length,
+  () => {
+    if (props.external) nextTick(measureWrapperOffset);
+  },
+);
 
 // 暴露方法给父组件
 defineExpose({
@@ -434,8 +538,15 @@ onMounted(() => {
   initializeHeights();
   // 等待 DOM 渲染和容器尺寸确定
   nextTick(() => {
-    calculateVisibleRange(0);
-    if (props.defaultScrollIndex) {
+    // 外滚模式：测量列表顶部相对滚动容器的偏移，用于滚动量换算
+    if (props.external) {
+      measureWrapperOffset();
+      // 用外部传入的滚动位置初始化
+      calculateVisibleRange(effectiveExternalScrollTop.value);
+    } else {
+      calculateVisibleRange(0);
+    }
+    if (props.defaultScrollIndex && !props.external) {
       scrollToIndex(props.defaultScrollIndex);
     }
     // 初始测量
@@ -456,6 +567,10 @@ onUnmounted(() => {
   width: 100%;
   contain: layout paint;
   overflow-anchor: none;
+}
+.virtual-list {
+  position: relative;
+  width: 100%;
 }
 .custom-virtual-list {
   /* will-change: transform; */

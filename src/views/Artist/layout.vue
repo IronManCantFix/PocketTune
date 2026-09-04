@@ -1,5 +1,10 @@
 <template>
-  <div ref="artistRef" :key="artistId" :class="['artist', { small: listScrolling }]">
+  <div
+    ref="artistRef"
+    :key="artistId"
+    :class="['artist', { small: listScrolling }]"
+    @scroll="pageScroll"
+  >
     <!-- 歌手头部（详情+标签），移动端随列表滚动整体上滑 -->
     <div class="artist-header">
       <Transition name="fade" mode="out-in">
@@ -138,6 +143,8 @@
             :is="Component"
             :id="artistId"
             class="router-view"
+            :external-scroll-top="mobileScrollTop"
+            :external-viewport-height="mobileViewportHeight"
             @scroll="listScroll"
           />
         </KeepAlive>
@@ -147,6 +154,8 @@
           :is="Component"
           :id="artistId"
           class="router-view"
+          :external-scroll-top="mobileScrollTop"
+          :external-viewport-height="mobileViewportHeight"
           @scroll="listScroll"
         />
       </Transition>
@@ -254,8 +263,8 @@ const getArtistDetail = async (id: number) => {
 
 // Tabs 改变
 const tabChange = (value: string) => {
-  // 切换标签时复位头部上滑状态
-  resetMobileHeader();
+  // 切换标签时回到顶部
+  scrollToTop();
   router.push({
     name: value,
     query: { id: artistId.value },
@@ -268,42 +277,49 @@ const playAllSongs = async () => {
   if (componentRef.value) componentRef.value.playAllSongs();
 };
 
+// 移动端整页滚动状态（驱动外滚模式虚拟列表）
+const mobileScrollTop = ref(0);
+const mobileViewportHeight = ref(0);
+
+// 监听歌手页容器尺寸，同步外滚模式虚拟列表的视口高度
+const { height: artistHeight } = useElementSize(artistRef);
+watch(artistHeight, (h) => {
+  if (h && isSmallScreen.value) mobileViewportHeight.value = h;
+});
+
+// 滚动到顶部（直接赋值滚动位置，避免 transition 打断平滑滚动）
+const scrollToTop = () => {
+  const root = artistRef.value;
+  if (!root) return;
+  root.scrollTop = 0;
+  // 同步外滚模式虚拟列表滚动位置
+  mobileScrollTop.value = 0;
+};
+
 // 列表滚动
 const listScroll = (e: Event) => {
-  // 滚动高度
-  const scrollTop = (e.target as HTMLElement).scrollTop;
   if (isSmallScreen.value) {
-    // 移动端：详情与标签随列表上滑滑出视口，为列表腾出高度
-    syncMobileHeader(scrollTop);
+    // 移动端：由整页滚动驱动（pageScroll），VirtualScroll 的滚动事件仅用于桌面端
     return;
   }
+  // 桌面端：滚动高度
+  const scrollTop = (e.target as HTMLElement).scrollTop;
   listScrolling.value = scrollTop > 10;
 };
 
-// 移动端：歌手头部随列表滚动整体上滑
-const syncMobileHeader = (scrollTop: number) => {
+// 移动端：整页滚动（歌手头部随页面滚出，列表从头部下方开始）
+const pageScroll = (e: Event) => {
   const root = artistRef.value;
   if (!root) return;
-  const header = root.querySelector<HTMLElement>(".artist-header");
-  if (!header) return;
-  // 头部总高度作为上滑上限，滑出后停驻
-  const offset = Math.min(scrollTop, header.offsetHeight);
-  header.style.transform = `translateY(${-offset}px)`;
-};
-
-// 重置移动端头部上滑状态
-const resetMobileHeader = () => {
-  const root = artistRef.value;
-  if (!root) return;
-  root.querySelectorAll<HTMLElement>(".artist-header").forEach((el) => {
-    el.style.transform = "";
-  });
+  const target = e.target as HTMLElement;
+  // 外滚模式虚拟列表：滚动位置与视口高度
+  mobileScrollTop.value = target.scrollTop;
+  mobileViewportHeight.value = target.clientHeight;
 };
 
 // 监听路由更新
 onBeforeRouteUpdate((to) => {
   listScrolling.value = false;
-  resetMobileHeader();
   // 检查是否仍在 artist 路由下
   const isArtistRoute = to.matched.some((m) => m.name === "artist");
   if (!isArtistRoute) return;
@@ -315,7 +331,8 @@ watch(
   () => artistId.value,
   (val) => {
     if (val) {
-      resetMobileHeader();
+      // 切换歌手时回到顶部，避免残留滚动位置
+      scrollToTop();
       getArtistDetail(val);
     }
   },
@@ -515,19 +532,19 @@ watch(
   }
 }
 
-// 移动端适配：歌手页纵向布局
+// 移动端适配：歌手页纵向布局，整页滚动（头部随页面滚出，列表从头部下方开始）
 @media (max-width: 768px) {
   .artist {
-    // 列表绝对定位铺满，头部悬浮其上，防止内容溢出视口
-    overflow: hidden;
+    // 歌手页自身作为滚动容器，头部与列表整体滚动
+    // 用布局高度变量固定视口高度（--layout-height 为无单位数值，需乘 1px）
+    // 双类提权，避免被基类 height:100% 覆盖
+    height: calc(var(--layout-height) * 1px) !important;
+    overflow-y: auto !important;
     .artist-header {
-      // 头部悬浮，随列表滚动整体上滑滑出视口
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      z-index: 2;
-      will-change: transform;
+      // 头部文档流占位，随整页滚动自然滚出视口
+      position: relative;
+      background-color: rgba(var(--background));
+      z-index: 1;
     }
     .detail {
       flex-direction: column;
@@ -563,19 +580,13 @@ watch(
       }
     }
     .router-view {
-      // 列表铺满歌手页高度，专辑/视频页在容器内滚动
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      z-index: 1;
-      overflow-y: auto;
-      // 单曲页由列表内部虚拟滚动，外层不再滚动
+      // 文档流，随整页滚动；高度由内容撑开
+      flex: none;
+      overflow: visible;
       &.artist-songs {
-        position: absolute;
+        position: static;
         padding-top: 0;
-        overflow: hidden;
+        overflow: visible;
       }
     }
   }
