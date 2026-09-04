@@ -47,7 +47,7 @@ class SongDownloadStrategy implements DownloadStrategy {
   constructor(
     public readonly song: SongType,
     private quality: SongLevelType,
-    private signal?: AbortSignal,
+    public signal?: AbortSignal,
   ) {}
 
   get id() {

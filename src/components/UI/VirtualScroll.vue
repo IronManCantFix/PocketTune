@@ -388,7 +388,7 @@ const handleScroll = (event: Event) => {
 // 外滚模式：外部滚动位置驱动可见窗口
 watch(
   () => props.externalScrollTop,
-  (top) => {
+  (_top) => {
     if (!props.external) return;
     // 把外部滚动量换算成列表自身滚动量（减去列表顶部偏移）
     const listTop = effectiveExternalScrollTop.value;

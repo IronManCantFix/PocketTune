@@ -2,7 +2,7 @@ import { useDataStore, useSettingStore } from "@/stores";
 import { openExcludeComment } from "@/utils/modal";
 import SongUnlockManager from "@/components/Modal/Setting/SongUnlockManager.vue";
 import UnblockSources from "../components/UnblockSources.vue";
-import { SettingConfig } from "@/types/settings";
+import { SettingConfig, settingValue } from "@/types/settings";
 
 export const useGeneralSettings = (): SettingConfig => {
   const dataStore = useDataStore();
@@ -50,10 +50,10 @@ export const useGeneralSettings = (): SettingConfig => {
             label: "显示搜索历史",
             description: "是否在搜索框的默认显示内容中显示当前搜索历史",
             type: "switch",
-            value: computed({
-              get: () => settingStore.showSearchHistory,
-              set: (v) => (settingStore.showSearchHistory = v),
-            }),
+            value: settingValue(
+              () => settingStore.showSearchHistory,
+              (v) => (settingStore.showSearchHistory = v),
+            ),
           },
           {
             key: "showHotSearch",
@@ -61,10 +61,10 @@ export const useGeneralSettings = (): SettingConfig => {
             type: "switch",
             show: computed(() => settingStore.useOnlineService),
             description: "是否在搜索框的默认显示内容中显示热搜榜单",
-            value: computed({
-              get: () => settingStore.showHotSearch,
-              set: (v) => (settingStore.showHotSearch = v),
-            }),
+            value: settingValue(
+              () => settingStore.showHotSearch,
+              (v) => (settingStore.showHotSearch = v),
+            ),
           },
           {
             key: "enableSearchKeyword",
@@ -72,10 +72,10 @@ export const useGeneralSettings = (): SettingConfig => {
             type: "switch",
             show: computed(() => settingStore.useOnlineService),
             description: "将搜索框闲置时的默认显示内容替换为搜索关键词建议",
-            value: computed({
-              get: () => settingStore.enableSearchKeyword,
-              set: (v) => (settingStore.enableSearchKeyword = v),
-            }),
+            value: settingValue(
+              () => settingStore.enableSearchKeyword,
+              (v) => (settingStore.enableSearchKeyword = v),
+            ),
           },
           {
             key: "searchInputBehavior",
@@ -87,20 +87,20 @@ export const useGeneralSettings = (): SettingConfig => {
               { label: "失焦后清空", value: "clear" },
               { label: "同步搜索词", value: "sync" },
             ],
-            value: computed({
-              get: () => settingStore.searchInputBehavior,
-              set: (v) => (settingStore.searchInputBehavior = v),
-            }),
+            value: settingValue(
+              () => settingStore.searchInputBehavior,
+              (v) => (settingStore.searchInputBehavior = v),
+            ),
           },
           {
             key: "hideBracketedContent",
             label: "隐藏括号与别名",
             type: "switch",
             description: "隐藏歌曲名与专辑名中的括号内容和别名",
-            value: computed({
-              get: () => settingStore.hideBracketedContent,
-              set: (v) => (settingStore.hideBracketedContent = v),
-            }),
+            value: settingValue(
+              () => settingStore.hideBracketedContent,
+              (v) => (settingStore.hideBracketedContent = v),
+            ),
           },
           {
             key: "configExcludeComment",
@@ -124,10 +124,10 @@ export const useGeneralSettings = (): SettingConfig => {
               { label: "网页版", value: "web" },
               { label: "移动版", value: "mobile" },
             ],
-            value: computed({
-              get: () => settingStore.shareUrlFormat,
-              set: (v) => (settingStore.shareUrlFormat = v),
-            }),
+            value: settingValue(
+              () => settingStore.shareUrlFormat,
+              (v) => (settingStore.shareUrlFormat = v),
+            ),
           },
         ],
       },
@@ -139,10 +139,10 @@ export const useGeneralSettings = (): SettingConfig => {
             label: "启用歌曲解锁",
             type: "switch",
             description: "对灰色/无版权歌曲尝试解锁播放",
-            value: computed({
-              get: () => settingStore.useSongUnlock,
-              set: (v) => (settingStore.useSongUnlock = v),
-            }),
+            value: settingValue(
+              () => settingStore.useSongUnlock,
+              (v) => (settingStore.useSongUnlock = v),
+            ),
           },
           {
             key: "unblockSources",

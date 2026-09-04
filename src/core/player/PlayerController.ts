@@ -1,5 +1,5 @@
 import { toRaw } from "vue";
-import { AudioErrorCode } from "@/core/audio-player/BaseAudioPlayer";
+import { AudioErrorCode, type AudioEventType } from "@/core/audio-player/BaseAudioPlayer";
 import { useDataStore, useMusicStore, useSettingStore, useStatusStore } from "@/stores";
 import type { AudioSourceType, QualityType, SongType } from "@/types/main";
 import type { RepeatModeType, ShuffleModeType } from "@/types/shared/play-mode";
@@ -555,7 +555,7 @@ class PlayerController {
   }
 
   /** 音频事件处理器引用，用于销毁时清理 */
-  private _audioEventHandlers: Map<string, EventListener> = new Map();
+  private _audioEventHandlers: Map<AudioEventType, EventListener> = new Map();
 
   /**
    * 统一音频事件绑定

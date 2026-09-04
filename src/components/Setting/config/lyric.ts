@@ -1,6 +1,6 @@
 import { useLyricManager } from "@/core/player/LyricManager";
 import { useSettingStore } from "@/stores";
-import type { SettingConfig } from "@/types/settings";
+import { SettingConfig, settingValue } from "@/types/settings";
 import { descMultiline } from "@/utils/format";
 import { openAMLLServer, openExcludeLyric, openFontManager } from "@/utils/modal";
 import LyricPreview from "../components/LyricPreview.vue";
@@ -26,10 +26,10 @@ export const useLyricSettings = (): SettingConfig => {
             label: "自适应歌词大小",
             type: "switch",
             description: "开启后歌词大小将根据窗口高度自动缩放，避免全屏时过小或窗口时过大",
-            value: computed({
-              get: () => settingStore.lyricFontSizeMode === "adaptive",
-              set: (v) => (settingStore.lyricFontSizeMode = v ? "adaptive" : "fixed"),
-            }),
+            value: settingValue(
+              () => settingStore.lyricFontSizeMode === "adaptive",
+              (v) => (settingStore.lyricFontSizeMode = v ? "adaptive" : "fixed"),
+            ),
           },
           {
             key: "lyricFontSize",
@@ -43,10 +43,10 @@ export const useLyricSettings = (): SettingConfig => {
             min: 12,
             max: 60,
             suffix: "px",
-            value: computed({
-              get: () => settingStore.lyricFontSize,
-              set: (v) => (settingStore.lyricFontSize = v || 30),
-            }),
+            value: settingValue(
+              () => settingStore.lyricFontSize,
+              (v) => (settingStore.lyricFontSize = v || 30),
+            ),
             defaultValue: 46,
           },
           {
@@ -61,10 +61,10 @@ export const useLyricSettings = (): SettingConfig => {
             min: 5,
             max: 40,
             suffix: "px",
-            value: computed({
-              get: () => settingStore.lyricTranFontSize,
-              set: (v) => (settingStore.lyricTranFontSize = v || 22),
-            }),
+            value: settingValue(
+              () => settingStore.lyricTranFontSize,
+              (v) => (settingStore.lyricTranFontSize = v || 22),
+            ),
             forceIf: {
               condition: () => settingStore.useAMLyrics,
               forcedValue: () => Math.max(0.5 * settingStore.lyricFontSize, 10),
@@ -84,10 +84,10 @@ export const useLyricSettings = (): SettingConfig => {
             min: 5,
             max: 40,
             suffix: "px",
-            value: computed({
-              get: () => settingStore.lyricRomaFontSize,
-              set: (v) => (settingStore.lyricRomaFontSize = v || 18),
-            }),
+            value: settingValue(
+              () => settingStore.lyricRomaFontSize,
+              (v) => (settingStore.lyricRomaFontSize = v || 18),
+            ),
             forceIf: {
               condition: () => settingStore.useAMLyrics,
               forcedValue: () => Math.max(0.5 * settingStore.lyricFontSize, 10),
@@ -111,10 +111,10 @@ export const useLyricSettings = (): SettingConfig => {
             min: 100,
             max: 900,
             step: 100,
-            value: computed({
-              get: () => settingStore.lyricFontWeight,
-              set: (v) => (settingStore.lyricFontWeight = v),
-            }),
+            value: settingValue(
+              () => settingStore.lyricFontWeight,
+              (v) => (settingStore.lyricFontWeight = v),
+            ),
           },
           {
             key: "lyricTransition",
@@ -125,10 +125,10 @@ export const useLyricSettings = (): SettingConfig => {
               { label: "滑动", value: "slide" },
               { label: "淡入淡出", value: "fade" },
             ],
-            value: computed({
-              get: () => settingStore.lyricTransition,
-              set: (v) => (settingStore.lyricTransition = v),
-            }),
+            value: settingValue(
+              () => settingStore.lyricTransition,
+              (v) => (settingStore.lyricTransition = v),
+            ),
           },
           {
             key: "lyricsPosition",
@@ -140,10 +140,10 @@ export const useLyricSettings = (): SettingConfig => {
               { label: "居中", value: "center" },
               { label: "居右", value: "flex-end" },
             ],
-            value: computed({
-              get: () => settingStore.lyricsPosition,
-              set: (v) => (settingStore.lyricsPosition = v),
-            }),
+            value: settingValue(
+              () => settingStore.lyricsPosition,
+              (v) => (settingStore.lyricsPosition = v),
+            ),
             forceIf: {
               condition: () => settingStore.useAMLyrics,
               forcedValue: "flex-start",
@@ -160,20 +160,20 @@ export const useLyricSettings = (): SettingConfig => {
             step: 1,
             marks: { 10: "默认" },
             formatTooltip: (v) => `${v}px`,
-            value: computed({
-              get: () => settingStore.lyricHorizontalOffset,
-              set: (v) => (settingStore.lyricHorizontalOffset = v),
-            }),
+            value: settingValue(
+              () => settingStore.lyricHorizontalOffset,
+              (v) => (settingStore.lyricHorizontalOffset = v),
+            ),
           },
           {
             key: "lyricAlignRight",
             label: "默认歌词靠右",
             type: "switch",
             description: "左右对唱位置互换",
-            value: computed({
-              get: () => settingStore.lyricAlignRight,
-              set: (v) => (settingStore.lyricAlignRight = v),
-            }),
+            value: settingValue(
+              () => settingStore.lyricAlignRight,
+              (v) => (settingStore.lyricAlignRight = v),
+            ),
           },
           {
             key: "lyricsScrollOffset",
@@ -185,48 +185,48 @@ export const useLyricSettings = (): SettingConfig => {
             step: 0.05,
             marks: { 0.1: "靠上", 0.9: "靠下" },
             formatTooltip: (v) => `${(v * 100).toFixed(0)}%`,
-            value: computed({
-              get: () => settingStore.lyricsScrollOffset,
-              set: (v) => (settingStore.lyricsScrollOffset = v),
-            }),
+            value: settingValue(
+              () => settingStore.lyricsScrollOffset,
+              (v) => (settingStore.lyricsScrollOffset = v),
+            ),
           },
           {
             key: "showWordLyrics",
             label: "显示逐字歌词",
             type: "switch",
             description: "对性能要求较高，若发生卡顿请关闭",
-            value: computed({
-              get: () => settingStore.showWordLyrics,
-              set: (v) => (settingStore.showWordLyrics = v),
-            }),
+            value: settingValue(
+              () => settingStore.showWordLyrics,
+              (v) => (settingStore.showWordLyrics = v),
+            ),
           },
           {
             key: "showTran",
             label: "显示歌词翻译",
             type: "switch",
-            value: computed({
-              get: () => settingStore.showTran,
-              set: (v) => (settingStore.showTran = v),
-            }),
+            value: settingValue(
+              () => settingStore.showTran,
+              (v) => (settingStore.showTran = v),
+            ),
           },
           {
             key: "showRoma",
             label: "显示歌词音译",
             type: "switch",
-            value: computed({
-              get: () => settingStore.showRoma,
-              set: (v) => (settingStore.showRoma = v),
-            }),
+            value: settingValue(
+              () => settingStore.showRoma,
+              (v) => (settingStore.showRoma = v),
+            ),
           },
           {
             key: "swapTranRoma",
             label: "调换翻译与音译位置",
             type: "switch",
             description: "开启后音译显示在翻译上方",
-            value: computed({
-              get: () => settingStore.swapTranRoma,
-              set: (v) => (settingStore.swapTranRoma = v),
-            }),
+            value: settingValue(
+              () => settingStore.swapTranRoma,
+              (v) => (settingStore.swapTranRoma = v),
+            ),
             forceIf: {
               condition: () => !settingStore.showTran || !settingStore.showRoma,
               forcedValue: false,
@@ -237,10 +237,10 @@ export const useLyricSettings = (): SettingConfig => {
             label: "歌词自动模糊",
             type: "switch",
             description: "是否聚焦显示当前播放行，其他行将模糊显示",
-            value: computed({
-              get: () => settingStore.lyricsBlur,
-              set: (v) => (settingStore.lyricsBlur = v),
-            }),
+            value: settingValue(
+              () => settingStore.lyricsBlur,
+              (v) => (settingStore.lyricsBlur = v),
+            ),
           },
           {
             key: "lyricsBlendMode",
@@ -251,10 +251,10 @@ export const useLyricSettings = (): SettingConfig => {
               { label: "Screen", value: "screen" },
               { label: "Plus Lighter", value: "plus-lighter" },
             ],
-            value: computed({
-              get: () => settingStore.lyricsBlendMode,
-              set: (v) => (settingStore.lyricsBlendMode = v),
-            }),
+            value: settingValue(
+              () => settingStore.lyricsBlendMode,
+              (v) => (settingStore.lyricsBlendMode = v),
+            ),
           },
           {
             key: "lyricOffsetStep",
@@ -265,10 +265,10 @@ export const useLyricSettings = (): SettingConfig => {
             max: 10000,
             step: 10,
             suffix: "ms",
-            value: computed({
-              get: () => settingStore.lyricOffsetStep,
-              set: (v) => (settingStore.lyricOffsetStep = v || 500),
-            }),
+            value: settingValue(
+              () => settingStore.lyricOffsetStep,
+              (v) => (settingStore.lyricOffsetStep = v || 500),
+            ),
             defaultValue: 500,
           },
         ],
@@ -291,20 +291,20 @@ export const useLyricSettings = (): SettingConfig => {
               }
               return options;
             }),
-            value: computed({
-              get: () => settingStore.lyricPriority,
-              set: (v) => lyricManager.switchLyricSource(v),
-            }),
+            value: settingValue(
+              () => settingStore.lyricPriority,
+              (v) => lyricManager.switchLyricSource(v),
+            ),
           },
           {
             key: "preferTraditionalChinese",
             label: "更喜欢繁体中文",
             type: "switch",
             description: "将简体中文的歌词文本和翻译内容转换为繁体中文",
-            value: computed({
-              get: () => settingStore.preferTraditionalChinese,
-              set: (v) => (settingStore.preferTraditionalChinese = v),
-            }),
+            value: settingValue(
+              () => settingStore.preferTraditionalChinese,
+              (v) => (settingStore.preferTraditionalChinese = v),
+            ),
             children: [
               {
                 key: "traditionalChineseVariant",
@@ -316,10 +316,10 @@ export const useLyricSettings = (): SettingConfig => {
                   { label: "台湾正体", value: "s2tw" },
                   { label: "香港繁体", value: "s2hk" },
                 ],
-                value: computed({
-                  get: () => settingStore.traditionalChineseVariant,
-                  set: (v) => (settingStore.traditionalChineseVariant = v),
-                }),
+                value: settingValue(
+                  () => settingStore.traditionalChineseVariant,
+                  (v) => (settingStore.traditionalChineseVariant = v),
+                ),
               },
             ],
           },
@@ -330,10 +330,10 @@ export const useLyricSettings = (): SettingConfig => {
             description:
               "是否从 AMLL TTML DB 获取歌词（如有），TTML 歌词支持逐字、翻译、音译等功能，将会在下一首歌生效",
             tags: [{ text: "Beta", type: "warning" }],
-            value: computed({
-              get: () => settingStore.enableOnlineTTMLLyric,
-              set: (v) => (settingStore.enableOnlineTTMLLyric = v),
-            }),
+            value: settingValue(
+              () => settingStore.enableOnlineTTMLLyric,
+              (v) => (settingStore.enableOnlineTTMLLyric = v),
+            ),
             children: [
               {
                 key: "amllDbServer",
@@ -358,10 +358,10 @@ export const useLyricSettings = (): SettingConfig => {
             label: "替换歌词括号内容",
             type: "switch",
             description: "将歌词中的括号内容替换为指定格式",
-            value: computed({
-              get: () => settingStore.replaceLyricBrackets,
-              set: (v) => (settingStore.replaceLyricBrackets = v),
-            }),
+            value: settingValue(
+              () => settingStore.replaceLyricBrackets,
+              (v) => (settingStore.replaceLyricBrackets = v),
+            ),
             children: [
               {
                 key: "bracketReplacementPreset",
@@ -374,10 +374,10 @@ export const useLyricSettings = (): SettingConfig => {
                   { label: "直角引号 (「 」)", value: "cornerBrackets" },
                   { label: "自定义", value: "custom" },
                 ],
-                value: computed({
-                  get: () => settingStore.bracketReplacementPreset,
-                  set: (v) => (settingStore.bracketReplacementPreset = v),
-                }),
+                value: settingValue(
+                  () => settingStore.bracketReplacementPreset,
+                  (v) => (settingStore.bracketReplacementPreset = v),
+                ),
                 condition: () => settingStore.bracketReplacementPreset === "custom",
                 children: [
                   {
@@ -386,16 +386,16 @@ export const useLyricSettings = (): SettingConfig => {
                     type: "text-input",
                     description:
                       "输入自定义的替换字符。支持单个分隔符（如 - ）或成对符号（如 () ）",
-                    value: computed({
-                      get: () => settingStore.customBracketReplacement,
-                      set: (v) => {
+                    value: settingValue(
+                      () => settingStore.customBracketReplacement,
+                      (v) => {
                         if (v.trim().length > 5) {
                           window.$message.warning("自定义替换内容不能超过 5 个字符");
                           return;
                         }
                         settingStore.customBracketReplacement = v;
                       },
-                    }),
+                    ),
                   },
                 ],
               },
@@ -412,30 +412,30 @@ export const useLyricSettings = (): SettingConfig => {
             label: "使用 Apple Music-like Lyrics",
             type: "switch",
             description: "歌词使用 Apple Music-like Lyrics 进行渲染，需要高性能设备",
-            value: computed({
-              get: () => settingStore.useAMLyrics,
-              set: (v) => (settingStore.useAMLyrics = v),
-            }),
+            value: settingValue(
+              () => settingStore.useAMLyrics,
+              (v) => (settingStore.useAMLyrics = v),
+            ),
             children: [
               {
                 key: "useAMSpring",
                 label: "歌词弹簧效果",
                 type: "switch",
                 description: "是否使用物理弹簧算法实现歌词动画效果，需要高性能设备",
-                value: computed({
-                  get: () => settingStore.useAMSpring,
-                  set: (v) => (settingStore.useAMSpring = v),
-                }),
+                value: settingValue(
+                  () => settingStore.useAMSpring,
+                  (v) => (settingStore.useAMSpring = v),
+                ),
               },
               {
                 key: "hidePassedLines",
                 label: "隐藏已播放歌词",
                 type: "switch",
                 description: "是否隐藏已播放歌词",
-                value: computed({
-                  get: () => settingStore.hidePassedLines,
-                  set: (v) => (settingStore.hidePassedLines = v),
-                }),
+                value: settingValue(
+                  () => settingStore.hidePassedLines,
+                  (v) => (settingStore.hidePassedLines = v),
+                ),
               },
               {
                 key: "wordFadeWidth",
@@ -451,19 +451,19 @@ export const useLyricSettings = (): SettingConfig => {
                 min: 0.01,
                 max: 1,
                 step: 0.01,
-                value: computed({
-                  get: () => settingStore.wordFadeWidth,
-                  set: (v) => (settingStore.wordFadeWidth = v),
-                }),
+                value: settingValue(
+                  () => settingStore.wordFadeWidth,
+                  (v) => (settingStore.wordFadeWidth = v),
+                ),
               },
               {
                 key: "showWordsRoma",
                 label: "显示逐字音译",
                 type: "switch",
-                value: computed({
-                  get: () => settingStore.showWordsRoma,
-                  set: (v) => (settingStore.showWordsRoma = v),
-                }),
+                value: settingValue(
+                  () => settingStore.showWordsRoma,
+                  (v) => (settingStore.showWordsRoma = v),
+                ),
               },
             ],
           },
