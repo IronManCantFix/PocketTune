@@ -2,7 +2,7 @@ import type { VNodeChild } from "vue";
 import { useSettingStore } from "@/stores";
 import { checkIsolationSupport } from "@/utils/env";
 import { renderOption } from "@/utils/helper";
-import { SettingConfig } from "@/types/settings";
+import { SettingConfig, settingValue } from "@/types/settings";
 import { AI_AUDIO_LEVELS } from "@/utils/meta";
 import { NTooltip, type SelectOption } from "naive-ui";
 
@@ -183,48 +183,48 @@ export const usePlaySettings = (): SettingConfig => {
             label: "下一首歌曲预载",
             type: "switch",
             description: "提前预加载下一首歌曲的播放地址，提升切换速度",
-            value: computed({
-              get: () => settingStore.useNextPrefetch,
-              set: (v) => (settingStore.useNextPrefetch = v),
-            }),
+            value: settingValue(
+              () => settingStore.useNextPrefetch,
+              (v) => (settingStore.useNextPrefetch = v),
+            ),
           },
           {
             key: "memoryLastSeek",
             label: "记忆上次播放位置",
             type: "switch",
             description: "程序启动时恢复上次播放位置",
-            value: computed({
-              get: () => settingStore.memoryLastSeek,
-              set: (v) => (settingStore.memoryLastSeek = v),
-            }),
+            value: settingValue(
+              () => settingStore.memoryLastSeek,
+              (v) => (settingStore.memoryLastSeek = v),
+            ),
           },
           {
             key: "preventSleep",
             label: "阻止系统息屏",
             type: "switch",
             description: "是否在播放界面阻止系统息屏",
-            value: computed({
-              get: () => settingStore.preventSleep,
-              set: (v) => (settingStore.preventSleep = v),
-            }),
+            value: settingValue(
+              () => settingStore.preventSleep,
+              (v) => (settingStore.preventSleep = v),
+            ),
           },
           {
             key: "progressTooltipShow",
             label: "显示进度条悬浮信息",
             type: "switch",
-            value: computed({
-              get: () => settingStore.progressTooltipShow,
-              set: (v) => (settingStore.progressTooltipShow = v),
-            }),
+            value: settingValue(
+              () => settingStore.progressTooltipShow,
+              (v) => (settingStore.progressTooltipShow = v),
+            ),
             children: [
               {
                 key: "progressLyricShow",
                 label: "进度条悬浮时显示歌词",
                 type: "switch",
-                value: computed({
-                  get: () => settingStore.progressLyricShow,
-                  set: (v) => (settingStore.progressLyricShow = v),
-                }),
+                value: settingValue(
+                  () => settingStore.progressLyricShow,
+                  (v) => (settingStore.progressLyricShow = v),
+                ),
               },
             ],
           },
@@ -233,19 +233,19 @@ export const usePlaySettings = (): SettingConfig => {
             label: "进度调节吸附最近歌词",
             type: "switch",
             description: "进度调节时从当前时间最近一句歌词开始播放",
-            value: computed({
-              get: () => settingStore.progressAdjustLyric,
-              set: (v) => (settingStore.progressAdjustLyric = v),
-            }),
+            value: settingValue(
+              () => settingStore.progressAdjustLyric,
+              (v) => (settingStore.progressAdjustLyric = v),
+            ),
           },
           {
             key: "songVolumeFade",
             label: "音乐渐入渐出",
             type: "switch",
-            value: computed({
-              get: () => settingStore.songVolumeFade,
-              set: (v) => (settingStore.songVolumeFade = v),
-            }),
+            value: settingValue(
+              () => settingStore.songVolumeFade,
+              (v) => (settingStore.songVolumeFade = v),
+            ),
             children: [
               {
                 key: "songVolumeFadeTime",
@@ -255,10 +255,10 @@ export const usePlaySettings = (): SettingConfig => {
                 min: 200,
                 max: 2000,
                 suffix: "ms",
-                value: computed({
-                  get: () => settingStore.songVolumeFadeTime,
-                  set: (v) => (settingStore.songVolumeFadeTime = v),
-                }),
+                value: settingValue(
+                  () => settingStore.songVolumeFadeTime,
+                  (v) => (settingStore.songVolumeFadeTime = v),
+                ),
               },
             ],
           },
@@ -272,9 +272,9 @@ export const usePlaySettings = (): SettingConfig => {
                 ? "是否启用自动混音功能"
                 : "自动混音功能仅在使用 Web Audio 引擎时可用",
             ),
-            value: computed({
-              get: () => settingStore.enableAutomix,
-              set: (v) => {
+            value: settingValue(
+              () => settingStore.enableAutomix,
+              (v) => {
                 if (v) {
                   window.$dialog.warning({
                     title: "启用自动混音 (Beta)",
@@ -290,7 +290,7 @@ export const usePlaySettings = (): SettingConfig => {
                   settingStore.enableAutomix = v;
                 }
               },
-            }),
+            ),
             disabled: computed(() => settingStore.playbackEngine !== "web-audio"),
             children: [
               {
@@ -301,10 +301,10 @@ export const usePlaySettings = (): SettingConfig => {
                 min: 5,
                 max: 300,
                 suffix: "s",
-                value: computed({
-                  get: () => settingStore.automixMaxAnalyzeTime,
-                  set: (v) => (settingStore.automixMaxAnalyzeTime = v),
-                }),
+                value: settingValue(
+                  () => settingStore.automixMaxAnalyzeTime,
+                  (v) => (settingStore.automixMaxAnalyzeTime = v),
+                ),
               },
             ],
           },
@@ -322,10 +322,10 @@ export const usePlaySettings = (): SettingConfig => {
             componentProps: {
               renderOption,
             },
-            value: computed({
-              get: () => settingStore.songLevel,
-              set: (v) => (settingStore.songLevel = v),
-            }),
+            value: settingValue(
+              () => settingStore.songLevel,
+              (v) => (settingStore.songLevel = v),
+            ),
           },
           {
             key: "disableAiAudio",
@@ -333,30 +333,30 @@ export const usePlaySettings = (): SettingConfig => {
             type: "switch",
             description:
               "开启后将隐藏部分 AI 增强音质选项（如超清母带、沉浸环绕声等），但会保留杜比全景声",
-            value: computed({
-              get: () => settingStore.disableAiAudio,
-              set: (v) => (settingStore.disableAiAudio = v),
-            }),
+            value: settingValue(
+              () => settingStore.disableAiAudio,
+              (v) => (settingStore.disableAiAudio = v),
+            ),
           },
           {
             key: "disableDjMode",
             label: "Fuck DJ Mode",
             type: "switch",
             description: "歌曲名字带有 DJ 抖音 0.9 0.8 网红 车载 热歌 慢摇 自动跳过",
-            value: computed({
-              get: () => settingStore.disableDjMode,
-              set: (v) => (settingStore.disableDjMode = v),
-            }),
+            value: settingValue(
+              () => settingStore.disableDjMode,
+              (v) => (settingStore.disableDjMode = v),
+            ),
           },
           {
             key: "uncensorMaskedProfanity",
             label: "Fuck *** Mode",
             type: "switch",
             description: "把歌词里的 f**k 等屏蔽词还原为原词",
-            value: computed({
-              get: () => settingStore.uncensorMaskedProfanity,
-              set: (v) => (settingStore.uncensorMaskedProfanity = v),
-            }),
+            value: settingValue(
+              () => settingStore.uncensorMaskedProfanity,
+              (v) => (settingStore.uncensorMaskedProfanity = v),
+            ),
           },
           {
             key: "audioEngine",
@@ -377,10 +377,10 @@ export const usePlaySettings = (): SettingConfig => {
             componentProps: {
               renderOption: renderAudioEngineOption,
             },
-            value: computed({
-              get: () => audioEngineSelectValue.value,
-              set: (v) => handleAudioEngineSelect(v),
-            }),
+            value: settingValue(
+              () => audioEngineSelectValue.value,
+              (v) => handleAudioEngineSelect(v),
+            ),
           },
           {
             key: "audioLatencyHint",
@@ -396,9 +396,9 @@ export const usePlaySettings = (): SettingConfig => {
               { label: "低延迟模式（interactive）", value: "interactive" },
               { label: "高效能模式（playback）", value: "playback" },
             ],
-            value: computed({
-              get: () => settingStore.audioLatencyHint,
-              set: (v) => {
+            value: settingValue(
+              () => settingStore.audioLatencyHint,
+              (v) => {
                 window.$dialog.warning({
                   title: "更改延迟策略",
                   content: "此操作需要重启应用才能生效，是否立即重启？",
@@ -410,7 +410,7 @@ export const usePlaySettings = (): SettingConfig => {
                   },
                 });
               },
-            }),
+            ),
             show: computed(
               () =>
                 settingStore.playbackEngine === "web-audio" &&
@@ -429,10 +429,10 @@ export const usePlaySettings = (): SettingConfig => {
             max: 1000,
             step: 10,
             suffix: "ms",
-            value: computed({
-              get: () => settingStore.audioDelayCompensation,
-              set: (v) => (settingStore.audioDelayCompensation = v ?? 0),
-            }),
+            value: settingValue(
+              () => settingStore.audioDelayCompensation,
+              (v) => (settingStore.audioDelayCompensation = v ?? 0),
+            ),
             defaultValue: 0,
           },
           {
@@ -440,10 +440,10 @@ export const usePlaySettings = (): SettingConfig => {
             label: "播放试听",
             type: "switch",
             description: "是否在非会员状态下播放试听歌曲",
-            value: computed({
-              get: () => settingStore.playSongDemo,
-              set: (v) => (settingStore.playSongDemo = v),
-            }),
+            value: settingValue(
+              () => settingStore.playSongDemo,
+              (v) => (settingStore.playSongDemo = v),
+            ),
           },
           {
             key: "enableReplayGain",
@@ -451,10 +451,10 @@ export const usePlaySettings = (): SettingConfig => {
             type: "switch",
             description:
               "平衡不同音频内容之间的音量大小（需要本地歌曲标签中有 replayGain 数据才会生效）",
-            value: computed({
-              get: () => settingStore.enableReplayGain,
-              set: (v) => (settingStore.enableReplayGain = v),
-            }),
+            value: settingValue(
+              () => settingStore.enableReplayGain,
+              (v) => (settingStore.enableReplayGain = v),
+            ),
             children: [
               {
                 key: "replayGainMode",
@@ -465,10 +465,10 @@ export const usePlaySettings = (): SettingConfig => {
                   { label: "单曲 (Track)", value: "track" },
                   { label: "专辑 (Album)", value: "album" },
                 ],
-                value: computed({
-                  get: () => settingStore.replayGainMode,
-                  set: (v) => (settingStore.replayGainMode = v),
-                }),
+                value: settingValue(
+                  () => settingStore.replayGainMode,
+                  (v) => (settingStore.replayGainMode = v),
+                ),
               },
             ],
           },

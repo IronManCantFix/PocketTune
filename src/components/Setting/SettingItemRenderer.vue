@@ -8,7 +8,7 @@
       <component
         v-if="item.type === 'custom' && item.component"
         :is="resolve(item.component)"
-        v-bind="item.componentProps"
+        v-bind="compProps"
         :item="item"
       />
     </template>
@@ -54,7 +54,7 @@
           :round="false"
           :disabled="isDisabled"
           :title="title"
-          v-bind="item.componentProps"
+          v-bind="compProps"
         />
 
         <!-- Select -->
@@ -65,7 +65,7 @@
           class="set"
           :disabled="isDisabled"
           :title="title"
-          v-bind="item.componentProps"
+          v-bind="compProps"
         />
 
         <!-- Input Number -->
@@ -78,7 +78,7 @@
           :step="resolve(item.step)"
           :disabled="isDisabled"
           :title="title"
-          v-bind="item.componentProps"
+          v-bind="compProps"
         >
           <template #prefix v-if="item.prefix">{{ resolve(item.prefix) }}</template>
           <template #suffix v-if="item.suffix">{{ resolve(item.suffix) }}</template>
@@ -89,12 +89,12 @@
           v-else-if="item.type === 'text-input'"
           v-model:value="modelValue"
           class="set"
-          :placeholder="item.componentProps?.placeholder"
-          :type="item.componentProps?.type || 'text'"
-          :show-password-on="item.componentProps?.showPasswordOn"
+          :placeholder="compProps?.placeholder"
+          :type="compProps?.type || 'text'"
+          :show-password-on="compProps?.showPasswordOn"
           :disabled="isDisabled"
           :title="title"
-          v-bind="item.componentProps"
+          v-bind="compProps"
         >
           <template #prefix v-if="item.prefix">{{ resolve(item.prefix) }}</template>
           <template #suffix v-if="item.suffix">{{ resolve(item.suffix) }}</template>
@@ -126,7 +126,7 @@
           :format-tooltip="item.formatTooltip"
           :disabled="isDisabled"
           :title="title"
-          v-bind="item.componentProps"
+          v-bind="compProps"
         />
 
         <!-- Button -->
@@ -138,7 +138,7 @@
           @click="handleAction"
           :disabled="isDisabled"
           :title="title"
-          v-bind="item.componentProps"
+          v-bind="compProps"
         >
           {{ resolve(item.buttonLabel) || "配置" }}
         </n-button>
@@ -148,8 +148,8 @@
           v-else-if="item.type === 'color-picker'"
           v-model:value="modelValue"
           class="set"
-          :show-alpha="item.componentProps?.showAlpha ?? false"
-          :modes="item.componentProps?.modes ?? ['hex']"
+          :show-alpha="compProps?.showAlpha ?? false"
+          :modes="compProps?.modes ?? ['hex']"
           :disabled="isDisabled"
           :title="title"
           @complete="handleAction"
@@ -159,7 +159,7 @@
         <component
           v-else-if="item.type === 'custom' && item.component"
           :is="item.component"
-          v-bind="item.componentProps"
+          v-bind="compProps"
           :item="item"
         />
       </div>
@@ -192,8 +192,8 @@ const props = defineProps<{
   highlighted?: boolean;
 }>();
 
-// 基础数据双向绑定处理
-const baseModelValue = computed({
+// 基础数据双向绑定处理（设置项的值类型不定，用 any 以兼容各种控件的 v-model）
+const baseModelValue = computed<any>({
   get: () => {
     if (props.item.value !== undefined) {
       return toValue(props.item.value);
@@ -209,6 +209,9 @@ const baseModelValue = computed({
   },
 });
 
+// 解包设置项的 componentProps（可能是 ref/computed，值类型用 any 以兼容各控件）
+const compProps = computed(() => toValue(props.item.componentProps) || {});
+
 // 强制显示条件判断
 const isForcedConditionMet = computed(() => {
   if (!props.item.forceIf) return false;
@@ -219,8 +222,8 @@ const isForcedConditionMet = computed(() => {
   return unref(condition);
 });
 
-// 最终使用的 modelValue
-const modelValue = computed({
+// 最终使用的 modelValue（同 baseModelValue，类型不定以兼容各控件）
+const modelValue = computed<any>({
   get: () => {
     if (isForcedConditionMet.value) {
       const forcedValueRef = props.item.forceIf!.forcedValue;

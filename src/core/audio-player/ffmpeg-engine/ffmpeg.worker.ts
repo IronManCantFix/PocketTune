@@ -276,6 +276,8 @@ async function handleExportWav(
 ) {
   const mountDir = `/export_${req.id}`;
   let decoder: AudioStreamDecoder | null = null;
+  // props 需提升到 try 外，供 finally 统一清理
+  let props: ReturnType<AudioStreamDecoder["init"]> | undefined;
 
   try {
     try {
@@ -287,7 +289,7 @@ async function handleExportWav(
 
     decoder = new module.AudioStreamDecoder();
     const filePath = `${mountDir}/${req.file.name}`;
-    const props = decoder.init(filePath);
+    props = decoder.init(filePath);
 
     if (props.status.status < 0) {
       throw new Error(`Export init failed: ${props.status.error}`);
@@ -334,8 +336,8 @@ async function handleExportWav(
       error: err.message,
     });
   } finally {
-    props.metadata.delete();
-    props.coverArt.delete();
+    props?.metadata.delete();
+    props?.coverArt.delete();
     if (decoder) {
       decoder.close();
       decoder.delete();

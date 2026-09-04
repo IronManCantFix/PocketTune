@@ -32,7 +32,7 @@
           <template v-for="(artist, index) in artistsList" :key="index">
             <n-grid :cols="24" :x-gap="12">
               <n-form-item-gi
-                :span="{ xxl: 14, xl: 14, lg: 14, md: 14, sm: 24, xs: 24 }"
+                :span="span2col"
                 :label="artistsList.length > 1 ? `歌手 ${index + 1}` : '歌手'"
               >
                 <n-input-group>
@@ -49,11 +49,7 @@
                   </n-button>
                 </n-input-group>
               </n-form-item-gi>
-              <n-form-item-gi
-                :span="{ xxl: 10, xl: 10, lg: 10, md: 10, sm: 24, xs: 24 }"
-                label="ID"
-                v-if="artist.id"
-              >
+              <n-form-item-gi :span="span3col" label="ID" v-if="artist.id">
                 <n-input-group>
                   <n-input :value="String(artist.id)" readonly />
                   <n-button
@@ -71,10 +67,7 @@
             </n-grid>
           </template>
           <n-grid :cols="24" :x-gap="12" v-if="albumData">
-            <n-form-item-gi
-              :span="{ xxl: 14, xl: 14, lg: 14, md: 14, sm: 24, xs: 24 }"
-              label="专辑"
-            >
+            <n-form-item-gi :span="span2col" label="专辑">
               <n-input-group>
                 <n-input :value="albumData.name" readonly placeholder="暂无专辑信息" />
                 <n-button
@@ -89,11 +82,7 @@
                 </n-button>
               </n-input-group>
             </n-form-item-gi>
-            <n-form-item-gi
-              :span="{ xxl: 10, xl: 10, lg: 10, md: 10, sm: 24, xs: 24 }"
-              label="ID"
-              v-if="albumData.id"
-            >
+            <n-form-item-gi :span="span3col" label="ID" v-if="albumData.id">
               <n-input-group>
                 <n-input :value="String(albumData.id)" readonly />
                 <n-button
@@ -111,10 +100,7 @@
           </n-grid>
           <n-divider class="divider"> 歌曲信息 </n-divider>
           <n-grid :cols="24" :x-gap="12">
-            <n-form-item-gi
-              :span="{ xxl: 12, xl: 12, lg: 12, md: 12, sm: 24, xs: 24 }"
-              label="歌曲 ID"
-            >
+            <n-form-item-gi :span="spanEqual" label="歌曲 ID">
               <n-input-group>
                 <n-input :value="String(songInfo?.id || '')" readonly />
                 <n-button
@@ -129,10 +115,7 @@
                 </n-button>
               </n-input-group>
             </n-form-item-gi>
-            <n-form-item-gi
-              :span="{ xxl: 12, xl: 12, lg: 12, md: 12, sm: 24, xs: 24 }"
-              label="时长"
-            >
+            <n-form-item-gi :span="spanEqual" label="时长">
               <n-input-group>
                 <n-input :value="duration" readonly />
                 <n-button type="primary" strong secondary @click="copyText(duration, '时长')">
@@ -187,6 +170,34 @@ import { copyData, getShareUrl } from "@/utils/helper";
 import { msToTime, formatTimestamp } from "@/utils/time";
 
 const props = defineProps<{ songId: number; onClose: () => void }>();
+
+// naive-ui FormItemGi 的 span 类型为 string | number，但响应式 span 对象
+// 由 GridItem 运行时支持，此处用断言兼容（不改运行时布局）
+type ResponsiveSpan = { xxl: number; xl: number; lg: number; md: number; sm: number; xs: number };
+const span2col = {
+  xxl: 14,
+  xl: 14,
+  lg: 14,
+  md: 14,
+  sm: 24,
+  xs: 24,
+} as ResponsiveSpan as unknown as string | number;
+const span3col = {
+  xxl: 10,
+  xl: 10,
+  lg: 10,
+  md: 10,
+  sm: 24,
+  xs: 24,
+} as ResponsiveSpan as unknown as string | number;
+const spanEqual = {
+  xxl: 12,
+  xl: 12,
+  lg: 12,
+  md: 12,
+  sm: 24,
+  xs: 24,
+} as ResponsiveSpan as unknown as string | number;
 
 const loading = ref(true);
 const songInfo = ref<SongType | null>(null);

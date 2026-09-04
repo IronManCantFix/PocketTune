@@ -1,5 +1,5 @@
 import { useSettingStore } from "@/stores";
-import { SettingConfig } from "@/types/settings";
+import { SettingConfig, settingValue } from "@/types/settings";
 import { computed, ref, h, markRaw } from "vue";
 import { NA } from "naive-ui";
 import { getAuthToken, getAuthUrl, getSession } from "@/api/lastfm";
@@ -84,10 +84,10 @@ export const useNetworkSettings = (): SettingConfig => {
             label: "启用流媒体",
             type: "switch",
             description: "开启后可使用并管理 Navidrome、Jellyfin 等流媒体服务",
-            value: computed({
-              get: () => settingStore.streamingEnabled,
-              set: (v) => (settingStore.streamingEnabled = v),
-            }),
+            value: settingValue(
+              () => settingStore.streamingEnabled,
+              (v) => (settingStore.streamingEnabled = v),
+            ),
           },
           {
             key: "serverList",
@@ -107,10 +107,10 @@ export const useNetworkSettings = (): SettingConfig => {
             label: "使用真实 IP 地址",
             type: "switch",
             description: "在海外或部分地区可能会受到限制，可开启此处尝试解决",
-            value: computed({
-              get: () => settingStore.useRealIP,
-              set: (v) => (settingStore.useRealIP = v),
-            }),
+            value: settingValue(
+              () => settingStore.useRealIP,
+              (v) => (settingStore.useRealIP = v),
+            ),
           },
           {
             key: "realIP",
@@ -120,10 +120,10 @@ export const useNetworkSettings = (): SettingConfig => {
             disabled: computed(() => !settingStore.useRealIP),
             prefix: "IP",
             componentProps: { placeholder: "127.0.0.1" },
-            value: computed({
-              get: () => settingStore.realIP,
-              set: (v) => (settingStore.realIP = v),
-            }),
+            value: settingValue(
+              () => settingStore.realIP,
+              (v) => (settingStore.realIP = v),
+            ),
           },
         ],
       },
@@ -135,20 +135,20 @@ export const useNetworkSettings = (): SettingConfig => {
             label: "开启浏览器媒体会话",
             type: "switch",
             description: "向浏览器发送 Media Session 媒体元数据",
-            value: computed({
-              get: () => settingStore.smtcOpen,
-              set: (v) => (settingStore.smtcOpen = v),
-            }),
+            value: settingValue(
+              () => settingStore.smtcOpen,
+              (v) => (settingStore.smtcOpen = v),
+            ),
           },
           {
             key: "lastfm_enabled",
             label: "启用 Last.fm",
             type: "switch",
             description: "开启后可记录播放历史到 Last.fm",
-            value: computed({
-              get: () => settingStore.lastfm.enabled,
-              set: (v) => (settingStore.lastfm.enabled = v),
-            }),
+            value: settingValue(
+              () => settingStore.lastfm.enabled,
+              (v) => (settingStore.lastfm.enabled = v),
+            ),
             children: [
               {
                 key: "lastfm_apikey",
@@ -181,10 +181,10 @@ export const useNetworkSettings = (): SettingConfig => {
                       " 处查看",
                     ]),
                   ]),
-                value: computed({
-                  get: () => settingStore.lastfm.apiKey,
-                  set: (v) => (settingStore.lastfm.apiKey = v),
-                }),
+                value: settingValue(
+                  () => settingStore.lastfm.apiKey,
+                  (v) => (settingStore.lastfm.apiKey = v),
+                ),
               },
               {
                 key: "lastfm_secret",
@@ -192,10 +192,10 @@ export const useNetworkSettings = (): SettingConfig => {
                 type: "text-input",
                 description: "Shared Secret，用于签名验证",
                 componentProps: { type: "password", showPasswordOn: "click" },
-                value: computed({
-                  get: () => settingStore.lastfm.apiSecret,
-                  set: (v) => (settingStore.lastfm.apiSecret = v),
-                }),
+                value: settingValue(
+                  () => settingStore.lastfm.apiSecret,
+                  (v) => (settingStore.lastfm.apiSecret = v),
+                ),
               },
               {
                 key: "lastfm_connect",
@@ -229,10 +229,10 @@ export const useNetworkSettings = (): SettingConfig => {
                 type: "switch",
                 description: "自动记录播放历史到 Last.fm",
                 condition: () => !!settingStore.lastfm.sessionKey,
-                value: computed({
-                  get: () => settingStore.lastfm.scrobbleEnabled,
-                  set: (v) => (settingStore.lastfm.scrobbleEnabled = v),
-                }),
+                value: settingValue(
+                  () => settingStore.lastfm.scrobbleEnabled,
+                  (v) => (settingStore.lastfm.scrobbleEnabled = v),
+                ),
               },
               {
                 key: "lastfm_nowplaying",
@@ -240,10 +240,10 @@ export const useNetworkSettings = (): SettingConfig => {
                 type: "switch",
                 description: "向 Last.fm 同步正在播放的歌曲",
                 condition: () => !!settingStore.lastfm.sessionKey,
-                value: computed({
-                  get: () => settingStore.lastfm.nowPlayingEnabled,
-                  set: (v) => (settingStore.lastfm.nowPlayingEnabled = v),
-                }),
+                value: settingValue(
+                  () => settingStore.lastfm.nowPlayingEnabled,
+                  (v) => (settingStore.lastfm.nowPlayingEnabled = v),
+                ),
               },
             ],
           },

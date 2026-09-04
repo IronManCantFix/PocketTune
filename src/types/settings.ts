@@ -1,4 +1,10 @@
-import { type Component, type Ref, type WritableComputedRef, type MaybeRefOrGetter } from "vue";
+import {
+  type Component,
+  type Ref,
+  type WritableComputedRef,
+  type MaybeRefOrGetter,
+  computed,
+} from "vue";
 import { SelectOption } from "naive-ui";
 
 /**
@@ -217,7 +223,10 @@ export interface SettingItem {
    * 传递给组件的 Props
    * 用于 `type` 为 `custom` 时传递 props，或覆盖内置组件的默认 props
    */
-  componentProps?: Record<string, unknown>;
+  componentProps?:
+    | Record<string, any>
+    | Ref<Record<string, any>>
+    | WritableComputedRef<Record<string, any>>;
 
   /**
    * 操作回调
@@ -311,4 +320,13 @@ export interface SettingConfig {
   groups: SettingGroup[];
   onActivate?: () => void;
   onDeactivate?: () => void;
+}
+
+/**
+ * 派生设置项的双向绑定值
+ * 直接把 getter/setter 组装成可写的响应式 ref，并自动从 getter 返回值推导 setter 参数类型，
+ * 避免 Vue 的 computed 选项式写法把 setter 参数推断为 unknown。
+ */
+export function settingValue<T>(get: () => T, set: (v: T) => void): WritableComputedRef<T> {
+  return computed({ get, set });
 }
