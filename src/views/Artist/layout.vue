@@ -1,131 +1,134 @@
 <template>
-  <div :key="artistId" :class="['artist', { small: listScrolling }]">
-    <Transition name="fade" mode="out-in">
-      <div v-if="artistDetailData" class="detail">
-        <div v-if="!settingStore.hiddenCovers.artistDetail" class="cover">
-          <n-image
-            :src="artistDetailData.coverSize?.m || artistDetailData.cover"
-            :previewed-img-props="{ style: { borderRadius: '8px' } }"
-            :preview-src="artistDetailData.cover"
-            :renderToolbar="renderToolbar"
-            show-toolbar-tooltip
-            class="cover-img"
-            @load="coverLoaded"
-          >
-            <template #placeholder>
-              <div class="cover-loading">
-                <img src="/images/artist.jpg?asset" class="loading-img" alt="loading-img" />
-              </div>
-            </template>
-          </n-image>
-          <!-- 封面背板 -->
-          <n-image
-            class="cover-shadow"
-            preview-disabled
-            :src="artistDetailData.coverSize?.m || artistDetailData.cover"
-          />
-        </div>
-        <div class="data">
-          <div class="name text-hidden">
-            <n-text class="name-text">{{
-              settingStore.hideBracketedContent
-                ? removeBrackets(artistDetailData.name)
-                : artistDetailData.name || "未知艺术家"
-            }}</n-text>
-            <n-text v-if="artistDetailData?.alia" class="name-alias" depth="3">
-              {{ artistDetailData.alia || "未知艺术家" }}
-            </n-text>
-          </div>
-          <n-collapse-transition :show="!listScrolling" class="collapse">
-            <!-- 职业 -->
-            <n-text v-if="artistDetailData?.identify" :depth="3" class="identify text-hidden">
-              {{ artistDetailData.identify }}
-            </n-text>
-            <!-- 信息 -->
-            <n-flex class="meta">
-              <div
-                class="item"
-                @click="router.push({ name: 'artist-songs', query: { id: artistId } })"
-              >
-                <SvgIcon name="Music" :depth="3" />
-                <n-text>{{ artistDetailData.musicSize || 0 }}</n-text>
-              </div>
-              <div
-                class="item"
-                @click="router.push({ name: 'artist-albums', query: { id: artistId } })"
-              >
-                <SvgIcon name="Album" :depth="3" />
-                <n-text>{{ artistDetailData.albumSize || 0 }}</n-text>
-              </div>
-              <div
-                class="item"
-                @click="router.push({ name: 'artist-videos', query: { id: artistId } })"
-              >
-                <SvgIcon name="Video" :depth="3" />
-                <n-text>{{ artistDetailData.mvSize || 0 }}</n-text>
-              </div>
-            </n-flex>
-            <!-- 简介 -->
-            <n-text
-              v-if="artistDetailData.description"
-              class="description text-hidden"
-              @click="openDescModal(artistDetailData.description, '歌手简介')"
+  <div ref="artistRef" :key="artistId" :class="['artist', { small: listScrolling }]">
+    <!-- 歌手头部（详情+标签），移动端随列表滚动整体上滑 -->
+    <div class="artist-header">
+      <Transition name="fade" mode="out-in">
+        <div v-if="artistDetailData" class="detail">
+          <div v-if="!settingStore.hiddenCovers.artistDetail" class="cover">
+            <n-image
+              :src="artistDetailData.coverSize?.m || artistDetailData.cover"
+              :previewed-img-props="{ style: { borderRadius: '8px' } }"
+              :preview-src="artistDetailData.cover"
+              :renderToolbar="renderToolbar"
+              show-toolbar-tooltip
+              class="cover-img"
+              @load="coverLoaded"
             >
-              {{ artistDetailData.description }}
-            </n-text>
-          </n-collapse-transition>
-          <n-flex class="menu" justify="space-between">
-            <n-flex class="left" align="flex-end">
-              <n-button
-                :focusable="false"
-                type="primary"
-                strong
-                secondary
-                round
-                @click="playAllSongs"
+              <template #placeholder>
+                <div class="cover-loading">
+                  <img src="/images/artist.jpg?asset" class="loading-img" alt="loading-img" />
+                </div>
+              </template>
+            </n-image>
+            <!-- 封面背板 -->
+            <n-image
+              class="cover-shadow"
+              preview-disabled
+              :src="artistDetailData.coverSize?.m || artistDetailData.cover"
+            />
+          </div>
+          <div class="data">
+            <div class="name text-hidden">
+              <n-text class="name-text">{{
+                settingStore.hideBracketedContent
+                  ? removeBrackets(artistDetailData.name)
+                  : artistDetailData.name || "未知艺术家"
+              }}</n-text>
+              <n-text v-if="artistDetailData?.alia" class="name-alias" depth="3">
+                {{ artistDetailData.alia || "未知艺术家" }}
+              </n-text>
+            </div>
+            <n-collapse-transition :show="!listScrolling" class="collapse">
+              <!-- 职业 -->
+              <n-text v-if="artistDetailData?.identify" :depth="3" class="identify text-hidden">
+                {{ artistDetailData.identify }}
+              </n-text>
+              <!-- 信息 -->
+              <n-flex class="meta">
+                <div
+                  class="item"
+                  @click="router.push({ name: 'artist-songs', query: { id: artistId } })"
+                >
+                  <SvgIcon name="Music" :depth="3" />
+                  <n-text>{{ artistDetailData.musicSize || 0 }}</n-text>
+                </div>
+                <div
+                  class="item"
+                  @click="router.push({ name: 'artist-albums', query: { id: artistId } })"
+                >
+                  <SvgIcon name="Album" :depth="3" />
+                  <n-text>{{ artistDetailData.albumSize || 0 }}</n-text>
+                </div>
+                <div
+                  class="item"
+                  @click="router.push({ name: 'artist-videos', query: { id: artistId } })"
+                >
+                  <SvgIcon name="Video" :depth="3" />
+                  <n-text>{{ artistDetailData.mvSize || 0 }}</n-text>
+                </div>
+              </n-flex>
+              <!-- 简介 -->
+              <n-text
+                v-if="artistDetailData.description"
+                class="description text-hidden"
+                @click="openDescModal(artistDetailData.description, '歌手简介')"
               >
-                <template #icon>
-                  <SvgIcon name="Play" />
-                </template>
-                播放
-              </n-button>
-              <n-button
-                :focusable="false"
-                strong
-                secondary
-                round
-                @click="toLikeArtist(artistId, !isLikeArtist)"
-              >
-                <template #icon>
-                  <SvgIcon :name="isLikeArtist ? 'Favorite' : 'FavoriteBorder'" />
-                </template>
-                {{ isLikeArtist ? "取消关注" : "关注歌手" }}
-              </n-button>
-              <!-- 更多 -->
-              <n-dropdown :options="moreOptions" trigger="click" placement="bottom-start">
-                <n-button :focusable="false" class="more" circle strong secondary>
+                {{ artistDetailData.description }}
+              </n-text>
+            </n-collapse-transition>
+            <n-flex class="menu" justify="space-between">
+              <n-flex class="left" align="flex-end">
+                <n-button
+                  :focusable="false"
+                  type="primary"
+                  strong
+                  secondary
+                  round
+                  @click="playAllSongs"
+                >
                   <template #icon>
-                    <SvgIcon name="List" />
+                    <SvgIcon name="Play" />
                   </template>
+                  播放
                 </n-button>
-              </n-dropdown>
+                <n-button
+                  :focusable="false"
+                  strong
+                  secondary
+                  round
+                  @click="toLikeArtist(artistId, !isLikeArtist)"
+                >
+                  <template #icon>
+                    <SvgIcon :name="isLikeArtist ? 'Favorite' : 'FavoriteBorder'" />
+                  </template>
+                  {{ isLikeArtist ? "取消关注" : "关注歌手" }}
+                </n-button>
+                <!-- 更多 -->
+                <n-dropdown :options="moreOptions" trigger="click" placement="bottom-start">
+                  <n-button :focusable="false" class="more" circle strong secondary>
+                    <template #icon>
+                      <SvgIcon name="List" />
+                    </template>
+                  </n-button>
+                </n-dropdown>
+              </n-flex>
             </n-flex>
-          </n-flex>
+          </div>
         </div>
-      </div>
-      <div v-else class="detail">
-        <n-skeleton v-if="!settingStore.hiddenCovers.artistDetail" class="cover" />
-        <div class="data">
-          <n-skeleton :repeat="4" text />
+        <div v-else class="detail">
+          <n-skeleton v-if="!settingStore.hiddenCovers.artistDetail" class="cover" />
+          <div class="data">
+            <n-skeleton :repeat="4" text />
+          </div>
         </div>
-      </div>
-    </Transition>
-    <!-- 标签页 -->
-    <n-tabs v-model:value="artistType" class="tabs" type="segment" @update:value="tabChange">
-      <n-tab name="artist-songs"> 单曲 </n-tab>
-      <n-tab name="artist-albums"> 专辑 </n-tab>
-      <n-tab name="artist-videos"> 视频 </n-tab>
-    </n-tabs>
+      </Transition>
+      <!-- 标签页 -->
+      <n-tabs v-model:value="artistType" class="tabs" type="segment" @update:value="tabChange">
+        <n-tab name="artist-songs"> 单曲 </n-tab>
+        <n-tab name="artist-albums"> 专辑 </n-tab>
+        <n-tab name="artist-videos"> 视频 </n-tab>
+      </n-tabs>
+    </div>
     <!-- 路由 -->
     <RouterView v-slot="{ Component }">
       <Transition :name="`router-${settingStore.routeAnimation}`" mode="out-in">
@@ -167,6 +170,8 @@ const route = useRoute();
 const router = useRouter();
 const dataStore = useDataStore();
 const settingStore = useSettingStore();
+// 根元素，移动端头部上滑联动用
+const artistRef = ref<HTMLElement | null>(null);
 // 与移动端样式的 @media (max-width: 768px) 保持一致
 const isSmallScreen = useMediaQuery("(max-width: 768px)");
 
@@ -249,6 +254,8 @@ const getArtistDetail = async (id: number) => {
 
 // Tabs 改变
 const tabChange = (value: string) => {
+  // 切换标签时复位头部上滑状态
+  resetMobileHeader();
   router.push({
     name: value,
     query: { id: artistId.value },
@@ -263,16 +270,40 @@ const playAllSongs = async () => {
 
 // 列表滚动
 const listScroll = (e: Event) => {
-  // 移动端为纵向布局，不收缩头部，避免布局跳动
-  if (isSmallScreen.value) return;
   // 滚动高度
   const scrollTop = (e.target as HTMLElement).scrollTop;
+  if (isSmallScreen.value) {
+    // 移动端：详情与标签随列表上滑滑出视口，为列表腾出高度
+    syncMobileHeader(scrollTop);
+    return;
+  }
   listScrolling.value = scrollTop > 10;
+};
+
+// 移动端：歌手头部随列表滚动整体上滑
+const syncMobileHeader = (scrollTop: number) => {
+  const root = artistRef.value;
+  if (!root) return;
+  const header = root.querySelector<HTMLElement>(".artist-header");
+  if (!header) return;
+  // 头部总高度作为上滑上限，滑出后停驻
+  const offset = Math.min(scrollTop, header.offsetHeight);
+  header.style.transform = `translateY(${-offset}px)`;
+};
+
+// 重置移动端头部上滑状态
+const resetMobileHeader = () => {
+  const root = artistRef.value;
+  if (!root) return;
+  root.querySelectorAll<HTMLElement>(".artist-header").forEach((el) => {
+    el.style.transform = "";
+  });
 };
 
 // 监听路由更新
 onBeforeRouteUpdate((to) => {
   listScrolling.value = false;
+  resetMobileHeader();
   // 检查是否仍在 artist 路由下
   const isArtistRoute = to.matched.some((m) => m.name === "artist");
   if (!isArtistRoute) return;
@@ -283,7 +314,10 @@ onBeforeRouteUpdate((to) => {
 watch(
   () => artistId.value,
   (val) => {
-    if (val) getArtistDetail(val);
+    if (val) {
+      resetMobileHeader();
+      getArtistDetail(val);
+    }
   },
   { immediate: true },
 );
@@ -484,6 +518,17 @@ watch(
 // 移动端适配：歌手页纵向布局
 @media (max-width: 768px) {
   .artist {
+    // 列表绝对定位铺满，头部悬浮其上，防止内容溢出视口
+    overflow: hidden;
+    .artist-header {
+      // 头部悬浮，随列表滚动整体上滑滑出视口
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 2;
+      will-change: transform;
+    }
     .detail {
       flex-direction: column;
       height: auto;
@@ -518,9 +563,19 @@ watch(
       }
     }
     .router-view {
+      // 列表铺满歌手页高度，专辑/视频页在容器内滚动
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+      overflow-y: auto;
+      // 单曲页由列表内部虚拟滚动，外层不再滚动
       &.artist-songs {
-        position: static;
+        position: absolute;
         padding-top: 0;
+        overflow: hidden;
       }
     }
   }

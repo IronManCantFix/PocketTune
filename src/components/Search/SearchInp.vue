@@ -268,7 +268,7 @@ onMounted(() => {
     }
     &.focus {
       position: fixed;
-      top: calc(env(safe-area-inset-top, 0px) + 15px);
+      top: 15px;
       left: 16px;
       right: 16px;
       width: auto;
