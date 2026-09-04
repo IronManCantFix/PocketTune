@@ -72,6 +72,14 @@ const initList = (enabledKeys?: string[]): SourceItem[] => {
 const list = ref<SourceItem[]>(initList());
 const effective = ref<string[]>([]);
 const custom = ref(false);
+const defaults = ref<string[]>([]);
+
+// 服务端音源状态响应
+type ServerSourcesResult = {
+  sources?: string[];
+  custom?: boolean;
+  defaults?: string[];
+};
 
 const labelOf = (key: string) => KNOWN_SOURCES.find((s) => s.key === key)?.label ?? key;
 
@@ -83,12 +91,26 @@ useSortable(sortableRef, list, {
   handle: ".drag-handle",
 } as Options);
 
+// 用服务端响应同步「当前生效」与开关状态，保证两者一致
+const applyServerState = (res: ServerSourcesResult | undefined | null) => {
+  effective.value = res?.sources ?? [];
+  custom.value = !!res?.custom;
+  if (res?.defaults?.length) defaults.value = res.defaults;
+  // 以服务端生效列表为准回填开关，避免本地残留配置与服务端不一致
+  if (effective.value.length > 0) list.value = initList(effective.value);
+};
+
 // 同步到服务端（防抖）
 const syncToServer = useDebounceFn(async () => {
   try {
     const res = await setUnblockSources(settingStore.unblockSources);
-    effective.value = res?.sources ?? [];
-    custom.value = !!res?.custom;
+    // 本地已清空自定义（如关闭全部音源）时，按服务端默认生效列表回填开关
+    if (settingStore.unblockSources.length === 0 && res?.sources?.length) {
+      applyServerState(res);
+    } else {
+      effective.value = res?.sources ?? [];
+      custom.value = !!res?.custom;
+    }
   } catch (error) {
     console.error("解灰音源同步失败:", error);
     window.$message.error("音源同步失败，请检查服务端连接");
@@ -103,26 +125,36 @@ const syncSetting = () => {
 
 const handleToggle = () => syncSetting();
 
-// 恢复默认顺序
-const resetSources = () => {
-  list.value = initList().map((item) => ({ ...item, enabled: false }));
-  syncSetting();
+// 恢复默认顺序：清除自定义并按服务端默认回填开关
+const resetSources = async () => {
+  settingStore.unblockSources = [];
+  const fallback = defaults.value.length > 0 ? defaults.value : KNOWN_SOURCES.map((s) => s.key);
+  list.value = initList(fallback);
+  try {
+    applyServerState(await setUnblockSources([]));
+  } catch (error) {
+    console.error("解灰音源恢复默认失败:", error);
+    window.$message.error("恢复默认失败，请检查服务端连接");
+    // 失败时按当前生效回填，保持开关与生效一致
+    if (effective.value.length > 0) list.value = initList(effective.value);
+  }
 };
 
-// 初始化：读取服务端当前状态，并在存在自定义配置时回填同步
+// 初始化：以服务端当前状态为准回填开关，保证与「当前生效」一致
 onMounted(async () => {
   try {
-    const res = await getUnblockSources();
-    effective.value = res?.sources ?? [];
-    custom.value = !!res?.custom;
-    // 未自定义时按服务端生效顺序回填开关状态，与默认顺序保持一致
-    if (settingStore.unblockSources.length === 0 && res?.sources?.length && !res?.custom) {
-      list.value = initList(res.sources);
-    }
+    applyServerState(await getUnblockSources());
   } catch (error) {
     console.error("解灰音源读取失败:", error);
   }
-  if (settingStore.unblockSources.length > 0) syncToServer();
+  // 本地存在自定义配置时同步到服务端，并用响应校准 UI
+  if (settingStore.unblockSources.length > 0) {
+    try {
+      applyServerState(await setUnblockSources(settingStore.unblockSources));
+    } catch (error) {
+      console.error("解灰音源同步失败:", error);
+    }
+  }
 });
 </script>
 

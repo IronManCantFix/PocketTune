@@ -273,7 +273,12 @@ onMounted(() => {
       flex: 1 1 auto;
       overflow: hidden;
       text-overflow: ellipsis;
-      white-space: nowrap;
+      word-break: break-word;
+      // 窄卡片下允许换行，避免单行省略导致显示不全
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      line-clamp: 2;
+      -webkit-box-orient: vertical;
     }
   }
   @media (max-width: 768px) {
@@ -281,19 +286,15 @@ onMounted(() => {
       grid-template-columns: repeat(1, 1fr);
     }
     .rec-list {
+      // 移动端改为单列上下布局，卡片宽度变大避免文字拥挤
       display: grid !important;
-      grid-template-columns: repeat(2, 1fr);
+      grid-template-columns: repeat(1, 1fr);
       gap: 12px;
     }
     .date {
       .name {
         font-size: 16px;
       }
-    }
-  }
-  @media (max-width: 380px) {
-    .rec-list {
-      grid-template-columns: repeat(1, 1fr);
     }
   }
 }

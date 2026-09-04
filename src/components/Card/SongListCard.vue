@@ -135,23 +135,19 @@ const songList = computed(() => sampleSize(props.data, 3));
         align-items: center;
         text-align: center;
       }
-      .name {
-        font-size: 18px;
-        font-weight: bold;
+      .name,
+      .desc {
         overflow: hidden;
         text-overflow: ellipsis;
+        word-break: break-word;
         display: -webkit-box;
         -webkit-line-clamp: 2;
         line-clamp: 2;
         -webkit-box-orient: vertical;
       }
-      .desc {
-        overflow: hidden;
-        text-overflow: ellipsis;
-        display: -webkit-box;
-        -webkit-line-clamp: 2;
-        line-clamp: 2;
-        -webkit-box-orient: vertical;
+      .name {
+        font-size: 18px;
+        font-weight: bold;
       }
     }
   }
@@ -165,6 +161,13 @@ const songList = computed(() => sampleSize(props.data, 3));
         margin-right: 12px;
       }
       .info {
+        .name,
+        .desc {
+          // 移动端允许文字完整显示，避免被全局单行截断
+          word-break: break-word;
+          -webkit-line-clamp: 2;
+          line-clamp: 2;
+        }
         .name {
           font-size: 15px;
         }

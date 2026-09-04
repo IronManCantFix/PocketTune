@@ -3,7 +3,7 @@
 set -e
 
 # start unblock service in the background
-npx unblockneteasemusic -p 80:443 -s -f ${NETEASE_SERVER_IP:-220.197.30.65} -o ${UNBLOCK_SOURCES:-kugou bodian pyncmd} 2>&1 &
+./node_modules/.bin/unblockneteasemusic -p 80:443 -s -f ${NETEASE_SERVER_IP:-220.197.30.65} -o ${UNBLOCK_SOURCES:-kugou bodian pyncmd} 2>&1 &
 
 # point the neteasemusic address to the unblock service
 if ! grep -q "music.163.com" /etc/hosts; then

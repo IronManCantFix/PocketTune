@@ -8,27 +8,46 @@ importers:
 
   .:
     dependencies:
-      '@applemusic-like-lyrics/core':
-        specifier: ^0.5.1
-        version: 0.5.1(@pixi/app@7.4.3(@pixi/core@7.4.3)(@pixi/display@7.4.3(@pixi/core@7.4.3)))(@pixi/core@7.4.3)(@pixi/display@7.4.3(@pixi/core@7.4.3))(@pixi/filter-blur@7.4.3(@pixi/core@7.4.3))(@pixi/filter-bulge-pinch@5.1.1(@pixi/core@7.4.3))(@pixi/filter-color-matrix@7.4.3(@pixi/core@7.4.3))(@pixi/sprite@7.4.3(@pixi/core@7.4.3)(@pixi/display@7.4.3(@pixi/core@7.4.3)))
-      '@applemusic-like-lyrics/lyric':
-        specifier: ^1.0.1
-        version: 1.0.1
       '@fastify/cookie':
         specifier: ^11.0.2
         version: 11.0.2
       '@fastify/multipart':
         specifier: ^9.4.0
         version: 9.4.0
+      '@neteasecloudmusicapienhanced/api':
+        specifier: ^4.34.3
+        version: 4.34.3
+      '@unblockneteasemusic/server':
+        specifier: ^0.28.0
+        version: 0.28.0
+      axios:
+        specifier: ^1.17.0
+        version: 1.17.0
+      change-case:
+        specifier: ^5.4.4
+        version: 5.4.4
+      fastify:
+        specifier: ^5.8.5
+        version: 5.8.5
+      tsx:
+        specifier: ^4.22.4
+        version: 4.22.4
+    devDependencies:
+      '@applemusic-like-lyrics/core':
+        specifier: ^0.5.1
+        version: 0.5.1(@pixi/app@7.4.3(@pixi/core@7.4.3)(@pixi/display@7.4.3(@pixi/core@7.4.3)))(@pixi/core@7.4.3)(@pixi/display@7.4.3(@pixi/core@7.4.3))(@pixi/filter-blur@7.4.3(@pixi/core@7.4.3))(@pixi/filter-bulge-pinch@5.1.1(@pixi/core@7.4.3))(@pixi/filter-color-matrix@7.4.3(@pixi/core@7.4.3))(@pixi/sprite@7.4.3(@pixi/core@7.4.3)(@pixi/display@7.4.3(@pixi/core@7.4.3)))
+      '@applemusic-like-lyrics/lyric':
+        specifier: ^1.0.1
+        version: 1.0.1
+      '@electron-toolkit/tsconfig':
+        specifier: ^2.0.0
+        version: 2.0.0(@types/node@24.13.0)
       '@imsyy/color-utils':
         specifier: ^1.0.2
         version: 1.0.2
       '@material/material-color-utilities':
         specifier: ^0.4.0
         version: 0.4.0
-      '@neteasecloudmusicapienhanced/api':
-        specifier: ^4.34.3
-        version: 4.34.3
       '@pixi/app':
         specifier: ^7.4.3
         version: 7.4.3(@pixi/core@7.4.3)(@pixi/display@7.4.3(@pixi/core@7.4.3))
@@ -50,30 +69,51 @@ importers:
       '@pixi/sprite':
         specifier: ^7.4.3
         version: 7.4.3(@pixi/core@7.4.3)(@pixi/display@7.4.3(@pixi/core@7.4.3))
-      '@unblockneteasemusic/server':
-        specifier: ^0.28.0
-        version: 0.28.0
+      '@types/emscripten':
+        specifier: ^1.41.5
+        version: 1.41.6
+      '@types/file-saver':
+        specifier: ^2.0.7
+        version: 2.0.7
+      '@types/js-cookie':
+        specifier: ^3.0.6
+        version: 3.0.6
+      '@types/md5':
+        specifier: ^2.3.6
+        version: 2.3.6
+      '@types/node':
+        specifier: ^24.13.0
+        version: 24.13.0
+      '@types/sortablejs':
+        specifier: ^1.15.9
+        version: 1.15.9
+      '@typescript-eslint/eslint-plugin':
+        specifier: ^8.60.1
+        version: 8.60.1(@typescript-eslint/parser@8.60.1(eslint@9.39.4(jiti@2.7.0))(typescript@6.0.3))(eslint@9.39.4(jiti@2.7.0))(typescript@6.0.3)
+      '@typescript-eslint/parser':
+        specifier: ^8.60.1
+        version: 8.60.1(eslint@9.39.4(jiti@2.7.0))(typescript@6.0.3)
+      '@vitejs/plugin-vue':
+        specifier: ^6.0.7
+        version: 6.0.7(vite@7.3.5(@types/node@24.13.0)(jiti@2.7.0)(sass@1.100.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))(vue@3.5.35(typescript@6.0.3))
       '@vueuse/core':
         specifier: ^14.3.0
         version: 14.3.0(vue@3.5.35(typescript@6.0.3))
       '@vueuse/integrations':
         specifier: ^14.3.0
         version: 14.3.0(async-validator@4.2.5)(axios@1.17.0)(change-case@5.4.4)(focus-trap@7.8.0)(fuse.js@7.4.1)(qrcode@1.5.4)(sortablejs@1.15.7)(vue@3.5.35(typescript@6.0.3))
-      axios:
-        specifier: ^1.17.0
-        version: 1.17.0
       axios-retry:
         specifier: ^4.5.0
         version: 4.5.0(axios@1.17.0)
-      change-case:
-        specifier: ^5.4.4
-        version: 5.4.4
       dayjs:
         specifier: ^1.11.21
         version: 1.11.21
-      fastify:
-        specifier: ^5.8.5
-        version: 5.8.5
+      eslint:
+        specifier: ^9.39.4
+        version: 9.39.4(jiti@2.7.0)
+      eslint-plugin-vue:
+        specifier: ^9.33.0
+        version: 9.33.0(eslint@9.39.4(jiti@2.7.0))
       file-saver:
         specifier: ^2.0.5
         version: 2.0.5
@@ -104,6 +144,9 @@ importers:
       md5:
         specifier: ^2.3.0
         version: 2.3.0
+      naive-ui:
+        specifier: 2.43.2
+        version: 2.43.2(vue@3.5.35(typescript@6.0.3))
       pinia:
         specifier: ^3.0.4
         version: 3.0.4(typescript@6.0.3)(vue@3.5.35(typescript@6.0.3))
@@ -113,58 +156,15 @@ importers:
       plyr:
         specifier: ^3.8.4
         version: 3.8.4
-      sortablejs:
-        specifier: ^1.15.7
-        version: 1.15.7
-      tsx:
-        specifier: ^4.22.4
-        version: 4.22.4
-    devDependencies:
-      '@electron-toolkit/tsconfig':
-        specifier: ^2.0.0
-        version: 2.0.0(@types/node@24.13.0)
-      '@types/emscripten':
-        specifier: ^1.41.5
-        version: 1.41.6
-      '@types/file-saver':
-        specifier: ^2.0.7
-        version: 2.0.7
-      '@types/js-cookie':
-        specifier: ^3.0.6
-        version: 3.0.6
-      '@types/md5':
-        specifier: ^2.3.6
-        version: 2.3.6
-      '@types/node':
-        specifier: ^24.13.0
-        version: 24.13.0
-      '@types/sortablejs':
-        specifier: ^1.15.9
-        version: 1.15.9
-      '@typescript-eslint/eslint-plugin':
-        specifier: ^8.60.1
-        version: 8.60.1(@typescript-eslint/parser@8.60.1(eslint@9.39.4(jiti@2.7.0))(typescript@6.0.3))(eslint@9.39.4(jiti@2.7.0))(typescript@6.0.3)
-      '@typescript-eslint/parser':
-        specifier: ^8.60.1
-        version: 8.60.1(eslint@9.39.4(jiti@2.7.0))(typescript@6.0.3)
-      '@vitejs/plugin-vue':
-        specifier: ^6.0.7
-        version: 6.0.7(vite@7.3.5(@types/node@24.13.0)(jiti@2.7.0)(sass@1.100.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))(vue@3.5.35(typescript@6.0.3))
-      eslint:
-        specifier: ^9.39.4
-        version: 9.39.4(jiti@2.7.0)
-      eslint-plugin-vue:
-        specifier: ^9.33.0
-        version: 9.33.0(eslint@9.39.4(jiti@2.7.0))
-      naive-ui:
-        specifier: 2.43.2
-        version: 2.43.2(vue@3.5.35(typescript@6.0.3))
       prettier:
         specifier: ^3.8.3
         version: 3.8.3
       sass:
         specifier: ^1.100.0
         version: 1.100.0
+      sortablejs:
+        specifier: ^1.15.7
+        version: 1.15.7
       terser:
         specifier: ^5.48.0
         version: 5.48.0
@@ -195,6 +195,33 @@ importers:
       vue-tsc:
         specifier: ^3.3.3
         version: 3.3.3(typescript@6.0.3)
+
+  server:
+    dependencies:
+      '@fastify/cookie':
+        specifier: ^11.0.2
+        version: 11.0.2
+      '@fastify/multipart':
+        specifier: ^9.4.0
+        version: 9.4.0
+      '@neteasecloudmusicapienhanced/api':
+        specifier: ^4.34.3
+        version: 4.34.3
+      '@unblockneteasemusic/server':
+        specifier: ^0.28.0
+        version: 0.28.0
+      axios:
+        specifier: ^1.17.0
+        version: 1.17.0
+      change-case:
+        specifier: ^5.4.4
+        version: 5.4.4
+      fastify:
+        specifier: ^5.8.5
+        version: 5.8.5
+      tsx:
+        specifier: ^4.22.4
+        version: 4.22.4
 
 packages:
 
