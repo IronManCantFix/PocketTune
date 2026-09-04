@@ -1,23 +1,23 @@
-# 手动发布：更新版本号 + 打 tag + 构建 Docker 镜像
-# 全程使用 GITHUB_TOKEN，无需额外配置 PAT
+# 自动化发布：推送 vX.Y.Z tag 即触发构建 Docker 镜像
+# 发布流程（由负责人确认"发版"后执行）：
+#   1. 将 package.json 的 version 改为目标版本（如 4.2.0），合并到 main 并推送
+#   2. 在 main 上打 tag vX.Y.Z（与 package.json version 一致）并推送
+#   3. 本工作流监听到 v* tag 自动触发，用 tag 名作为发布版本
 #
-# 用法：Actions 页 → Publish → Run workflow
-#   - 推荐在 version 输入框手动填写本次发布版本号（版本号只在发版时更新，见 docs/VERSIONING.md）
-#   - 留空才会自动 patch+1（如 1.0.0 → 1.0.1），请仅在确认需要时使用
+# 全程使用 GITHUB_TOKEN，无需额外配置 PAT
+# 说明：GITHUB_TOKEN 触发的 tag 推送不会再次触发本 workflow，避免递归
 
 name: Publish
 
 on:
-  workflow_dispatch:
-    inputs:
-      version:
-        description: "指定版本号（留空则自动 patch+1）"
-        required: false
-        default: ""
+  # 监听 v 开头的 git tag 推送，自动开始发布构建
+  push:
+    tags:
+      - "v*"
 
 jobs:
   publish:
-    name: Version bump & build
+    name: Publish & build
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -25,66 +25,25 @@ jobs:
     steps:
       - name: Check out the repo
         uses: actions/checkout@v6
-        with:
-          # 需要历史以允许写回提交
-          fetch-depth: 0
 
-      # 先与远程最新对齐（此时工作区干净），避免并发提交导致后续 push 被拒
-      - name: Sync to latest remote
-        env:
-          REF_NAME: ${{ github.ref_name }}
-        run: |
-          git fetch origin "$REF_NAME"
-          git checkout "$REF_NAME"
-          git reset --hard "origin/$REF_NAME"
-
-      - name: Determine new version
+      # 版本号直接取自 tag（去掉 v 前缀），核对语义化版本格式，避免误触发
+      - name: Resolve version from tag
         id: version
         run: |
-          CURRENT=$(node -p "require('./package.json').version")
-          INPUT="${{ inputs.version }}"
-          if [ -n "$INPUT" ]; then
-            NEW="$INPUT"
-          else
-            # 自动递增 patch 版本：major.minor.patch → major.minor.patch+1
-            MAJOR="${CURRENT%%.*}"
-            REST="${CURRENT#*.}"
-            MINOR="${REST%%.*}"
-            PATCH="${REST#*.}"
-            NEW="$MAJOR.$MINOR.$((PATCH + 1))"
+          TAG="${{ github.ref_name }}"
+          VERSION="${TAG#v}"
+          if ! echo "$VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "tag 格式应为 vX.Y.Z，实际为 $TAG"
+            exit 1
           fi
-          echo "current=$CURRENT" >> "$GITHUB_OUTPUT"
-          echo "new=$NEW" >> "$GITHUB_OUTPUT"
-          echo "tag=v$NEW" >> "$GITHUB_OUTPUT"
+          echo "current=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+          echo "new=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
-      - name: Update package.json version
+      - name: Show resolved version
         run: |
-          node -e "
-            const fs = require('fs');
-            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
-            pkg.version = '${{ steps.version.outputs.new }}';
-            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
-          "
-
-      - name: Show updated version
-        run: |
-          echo "当前版本: ${{ steps.version.outputs.current }} -> ${{ steps.version.outputs.new }}"
+          echo "发布版本: ${{ steps.version.outputs.new }} (tag: ${{ steps.version.outputs.tag }})"
           grep '"version"' package.json
-
-      # 写回版本号并打 tag，使用 GITHUB_TOKEN 推送
-      # 说明：GITHUB_TOKEN 触发的 push 不会再次触发本 workflow，避免递归
-      # 已在前面步骤对齐到最新远程，此处直接提交推送即可
-      - name: Commit and push version & tag
-        env:
-          REF_NAME: ${{ github.ref_name }}
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add package.json
-          git commit -m "chore(version): v${{ steps.version.outputs.new }}"
-          git tag "${{ steps.version.outputs.tag }}"
-          git push origin "HEAD:$REF_NAME"
-          git push origin "${{ steps.version.outputs.tag }}"
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -106,7 +65,6 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # 镜像 tag 使用本次发布的新版本号（dispatch 下 semver 元数据取不到，直接显式指定）
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v5
