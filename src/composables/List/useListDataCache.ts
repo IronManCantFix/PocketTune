@@ -1,3 +1,5 @@
+import { toRaw } from "vue";
+import { cloneDeep } from "lodash-es";
 import type { CoverType, SongType } from "@/types/main";
 import localforage from "localforage";
 
@@ -61,13 +63,14 @@ export const useListDataCache = () => {
     detail: CoverType,
     songs: SongType[],
   ): Promise<void> => {
+    // 解除 Vue 响应式代理并深拷贝为普通对象，避免 IndexedDB 写入时结构化克隆失败
     const cacheData: ListCacheData = {
       version: CACHE_VERSION,
       timestamp: Date.now(),
       type,
       id,
-      detail,
-      songs,
+      detail: cloneDeep(toRaw(detail)),
+      songs: cloneDeep(toRaw(songs)),
     };
 
     const key = getCacheKey(type, id);
