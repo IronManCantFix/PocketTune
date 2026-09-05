@@ -24,6 +24,11 @@ export class AudioElementPlayer extends BaseAudioPlayer {
   /** 目标时间缓存，用于在 seek 过程中返回稳定的 currentTime */
   private targetSeekTime = 0;
 
+  /** 后台直放标志：页面不可见时绕过效果链路直连扬声器，保证后台持续播放 */
+  private isBackgroundBypass = false;
+  /** visibilitychange 监听引用，用于销毁时移除 */
+  private visibilityHandler: (() => void) | null = null;
+
   /** 引擎能力描述 */
   public override readonly capabilities: EngineCapabilities = {
     supportsRate: true,
@@ -39,6 +44,16 @@ export class AudioElementPlayer extends BaseAudioPlayer {
     this.bindInternalEvents();
 
     this.audioElement.addEventListener("seeked", this._seekedHandler);
+
+    // 监听页面可见性：切后台时启用直放保活，回前台恢复效果链路
+    this.visibilityHandler = () => {
+      if (document.hidden) {
+        this.enableBackgroundBypass();
+      } else {
+        this.disableBackgroundBypass();
+      }
+    };
+    document.addEventListener("visibilitychange", this.visibilityHandler);
   }
 
   /**
@@ -57,8 +72,56 @@ export class AudioElementPlayer extends BaseAudioPlayer {
 
       // 连接: Source -> Input
       this.sourceNode.connect(this.inputNode);
+
+      // 若初始化时页面已在后台，立即切换到直放模式
+      if (document.hidden) {
+        this.enableBackgroundBypass();
+      }
     } catch (error) {
       console.error("[AudioElementPlayer] SourceNode 创建失败", error);
+    }
+  }
+
+  /**
+   * 启用后台直放
+   * 页面不可见时绕过 EQ/增益等效果节点，sourceNode 直连扬声器，
+   * 并主动唤醒被浏览器挂起的 AudioContext，保证安卓后台持续播放
+   */
+  private enableBackgroundBypass(): void {
+    if (this.isBackgroundBypass) return;
+    if (!this.audioCtx || !this.sourceNode) return;
+
+    this.isBackgroundBypass = true;
+
+    try {
+      // 断开效果链路，直连目的地，绕过中间处理节点
+      this.sourceNode.disconnect();
+      this.sourceNode.connect(this.audioCtx.destination);
+
+      // 唤醒可能被浏览器挂起的 AudioContext
+      if (this.audioCtx.state === "suspended") {
+        void this.audioCtx.resume();
+      }
+    } catch (error) {
+      console.error("[AudioElementPlayer] 启用后台直放失败", error);
+    }
+  }
+
+  /**
+   * 恢复前台效果链路
+   * 重新将 sourceNode 接回 inputNode，恢复 EQ/增益等处理
+   */
+  private disableBackgroundBypass(): void {
+    if (!this.isBackgroundBypass) return;
+    if (!this.audioCtx || !this.sourceNode || !this.inputNode) return;
+
+    this.isBackgroundBypass = false;
+
+    try {
+      this.sourceNode.disconnect();
+      this.sourceNode.connect(this.inputNode);
+    } catch (error) {
+      console.error("[AudioElementPlayer] 恢复前台效果链路失败", error);
     }
   }
 
@@ -263,6 +326,11 @@ export class AudioElementPlayer extends BaseAudioPlayer {
 
   /** 销毁引擎，释放资源 */
   public override destroy(): void {
+    // 清理 visibilitychange 监听
+    if (this.visibilityHandler) {
+      document.removeEventListener("visibilitychange", this.visibilityHandler);
+      this.visibilityHandler = null;
+    }
     // 清理事件监听器
     if (this._eventHandlers.length > 0) {
       this._eventHandlers.forEach(({ eventType, handler }) => {
