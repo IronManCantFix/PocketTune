@@ -568,23 +568,45 @@ const handleTabChange = (value: "songs" | "comments") => {
     @media (max-width: 768px) {
       height: 180px;
       .cover {
+        // 移动端缩小封面，为右侧信息区腾出空间
+        width: 100px;
+        height: 100px;
+        flex: none;
+        // 封面顶部对齐，避免拉伸，不影响右侧信息区高度
+        align-self: flex-start;
         margin-right: 12px;
       }
       .data {
         padding-right: 20px;
         .name {
-          font-size: 22px;
-          margin-bottom: 8px;
+          font-size: 18px;
+          line-height: 26px;
+          margin-bottom: 6px;
         }
         .collapse {
-          top: 42px;
+          top: 36px;
+        }
+        .meta {
+          .item {
+            font-size: 13px;
+            min-width: 0;
+            :deep(.n-text) {
+              overflow: hidden;
+              text-overflow: ellipsis;
+              white-space: nowrap;
+            }
+          }
         }
         .menu {
+          // 移动端按钮压缩，避免播放/收藏/更多挤在一起
           :deep(.n-button) {
-            height: 34px;
+            height: 32px;
             --n-font-size: 13px;
-            --n-padding: 0 14px;
-            --n-icon-size: 16px;
+            --n-padding: 0 12px;
+            --n-icon-size: 15px;
+          }
+          .more {
+            width: 32px;
           }
         }
       }
@@ -598,6 +620,13 @@ const handleTabChange = (value: "songs" | "comments") => {
         .cover-mask,
         .play-count {
           opacity: 0;
+        }
+      }
+      @media (max-width: 768px) {
+        // 移动端收起状态下封面跟随头部高度缩小
+        .cover {
+          width: 84px;
+          height: 84px;
         }
       }
       .data {
