@@ -14,6 +14,8 @@ import { calculateProgress } from "@/utils/time";
 import type { LyricLine } from "@applemusic-like-lyrics/lyric";
 import { type DebouncedFunc, throttle } from "lodash-es";
 import { useAudioManager } from "./AudioManager";
+import { AudioScheduler } from "@/core/automix/AudioScheduler";
+import { getSharedAudioContext } from "@/core/automix/SharedAudioContext";
 import { useAutomixManager } from "@/core/automix/AutomixManager";
 import { useLyricManager } from "./LyricManager";
 import { mediaSessionManager } from "./MediaSessionManager";
@@ -37,6 +39,8 @@ class PlayerController {
   private failSkipCount = 0;
   /** 是否正在进行 Automix 过渡 */
   public isTransitioning = false;
+  /** 后台切歌兜底调度器（Web Worker + 音频时钟，后台不受节流） */
+  private songEndScheduler: AudioScheduler | null = null;
   /** 负责管理播放模式相关的逻辑 */
   private playModeManager = new PlayModeManager();
   /** 播放进度更新回调 */
@@ -234,6 +238,8 @@ class PlayerController {
     // 生成新的请求标识
     this.currentRequestToken++;
     const requestToken = this.currentRequestToken;
+    // 新歌开始前取消上一首的后台播完兜底
+    this.disarmSongEndFallback();
     const { autoPlay = true, seek = 0 } = options;
     // 要播放的歌曲对象
     const playSongData = options.song || getPlaySongData();
@@ -300,6 +306,8 @@ class PlayerController {
       if (requestToken !== this.currentRequestToken) return;
       // 后置处理
       await this.afterPlaySetup(playSongData);
+      // 后台播完兜底检测：仅在真正开始播放时启动
+      if (autoPlay) this.armSongEndFallback();
       statusStore.playLoading = false;
     } catch (error) {
       if (requestToken === this.currentRequestToken) {
@@ -620,12 +628,7 @@ class PlayerController {
 
     // 播放结束
     const onEnded = () => {
-      if (this.isTransitioning) return;
-      useAutomixManager().resetAutomixScheduling("IDLE");
-      console.log(`⏹️ [${musicStore.playSong?.id}] 歌曲结束`);
-      lastfmScrobbler.stop();
-      if (this.checkAutoClose()) return;
-      this.nextOrPrev("next", true, true);
+      this.handleSongEnd();
     };
     audioManager.addEventListener("ended", onEnded);
     this._audioEventHandlers.set("ended", onEnded);
@@ -832,6 +835,8 @@ class PlayerController {
     const fadeTime = settingStore.getFadeTime ? settingStore.getFadeTime / 1000 : 0;
     audioManager.pause({ fadeOut: !!fadeTime, fadeDuration: fadeTime });
 
+    // 暂停时取消后台播完兜底
+    this.disarmSongEndFallback();
     if (changeStatus) statusStore.playStatus = false;
   }
 
@@ -904,6 +909,72 @@ class PlayerController {
     // 更新状态并播放
     statusStore.playIndex = nextIndex;
     await this.playSong({ autoPlay: play });
+  }
+
+  /** 上次歌曲结束处理时间戳（防重：兜底与 ended 竞态） */
+  private lastSongEndTs = 0;
+
+  /**
+   * 统一的歌曲播放结束处理
+   * 由原生 ended 事件与后台兜底检测共同调用，处理逻辑完全一致
+   */
+  private handleSongEnd(): void {
+    if (this.isTransitioning) return;
+    const now = Date.now();
+    // 短时间重复触发（后台兜底与前端 ended 竞态）只处理一次
+    if (now - this.lastSongEndTs < 1000) {
+      this.lastSongEndTs = now;
+      return;
+    }
+    this.lastSongEndTs = now;
+    useAutomixManager().resetAutomixScheduling("IDLE");
+    console.log(`⏹️ [${useMusicStore().playSong?.id}] 歌曲结束`);
+    lastfmScrobbler.stop();
+    if (this.checkAutoClose()) return;
+    this.nextOrPrev("next", true, true);
+  }
+
+  /**
+   * 启动后台播完兜底检测
+   * 每次成功开始播放新歌时调用：
+   * 复用 AudioScheduler（Web Worker + 音频硬件时钟），后台不受浏览器节流，
+   * 在主线程 ended 事件被抑制时补切下一首
+   */
+  private armSongEndFallback(): void {
+    if (!this.songEndScheduler) {
+      const ctx = getSharedAudioContext();
+      this.songEndScheduler = new AudioScheduler(ctx, { intervalMs: 200 });
+      this.songEndScheduler.setTickHandler(this.onSongEndFallbackTick.bind(this));
+      this.songEndScheduler.start();
+    }
+  }
+
+  /** 取消后台播完兜底检测，释放调度器 */
+  private disarmSongEndFallback(): void {
+    if (this.songEndScheduler) {
+      this.songEndScheduler.stop();
+      this.songEndScheduler = null;
+    }
+  }
+
+  /**
+   * 后台兜底检测回调
+   * 由 AudioScheduler 每 200ms 调用（Web Worker 时钟，后台可靠）：
+   * 仅在页面不可见时生效，检测到已播到结尾而 ended 未触发时补切下一首
+   */
+  private onSongEndFallbackTick(): void {
+    // 前台由原生 ended 负责，兜底仅在后台生效，避免竞态双切
+    if (!document.hidden) return;
+    const audioManager = useAudioManager();
+    if (audioManager.paused) return;
+    const duration = audioManager.duration;
+    if (!duration || duration <= 0) return;
+    const currentTime = audioManager.currentTime;
+    if (!Number.isFinite(currentTime)) return;
+    // 已接近/到达结尾（ended 被后台抑制未触发）→ 补切下一首
+    if (currentTime >= duration - 0.05) {
+      this.handleSongEnd();
+    }
   }
 
   /** 获取总时长 (ms) */
@@ -1434,6 +1505,8 @@ class PlayerController {
    * 销毁播放器控制器，释放所有资源
    */
   public destroy(): void {
+    // 清理后台播完兜底调度
+    this.disarmSongEndFallback();
     // 清理自动关闭定时器
     if (this.autoCloseInterval) {
       clearInterval(this.autoCloseInterval);
