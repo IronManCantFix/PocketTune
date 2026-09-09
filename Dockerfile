@@ -50,8 +50,6 @@ RUN apk add --no-cache nodejs \
 
 WORKDIR /app
 
-ENV NODE_TLS_REJECT_UNAUTHORIZED=0
-
 ENTRYPOINT ["/docker-entrypoint.sh"]
 
 # 启动本地后端服务

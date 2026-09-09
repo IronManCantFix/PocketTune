@@ -12,11 +12,11 @@ services:
     restart: always
     environment:
       # 所有变量都不是必填项
-      # 网易云服务端 IP, 可在宿主机通过 ping music.163.com 获得
-      - NETEASE_SERVER_IP=220.197.30.65
-      # UnblockNeteaseMusic 使用的音源, 支持列表见 https://github.com/UnblockNeteaseMusic/server?tab=readme-ov-file#%E9%9F%B3%E6%BA%90%E6%B8%85%E5%8D%95
+      # UnblockNeteaseMusic 使用的音源（后端内置解灰）, 支持列表见 https://github.com/UnblockNeteaseMusic/server?tab=readme-ov-file#%E9%9F%B3%E6%BA%90%E6%B8%85%E5%8D%95
       - UNBLOCK_SOURCES=kugou kuwo bilibili
-      # 可添加 UnblockNeteaseMusic 支持的任何环境变量, 支持列表见 https://github.com/UnblockNeteaseMusic/server?tab=readme-ov-file#%E7%8E%AF%E5%A2%83%E5%8F%98%E9%87%8F
+      # 是否启用后端内置解灰（默认开启）
+      # - UNM_ENABLED=false
+      # 内置解灰可用的其他环境变量
       - ENABLE_FLAC=false
       - ENABLE_HTTPDNS=false
       - BLOCK_ADS=true
@@ -31,6 +31,3 @@ services:
       # DLNA 投送固定拉流基址（可选）：使用域名访问时建议配置为内网地址，
       # 使电视始终走局域网拉流，与访问入口解耦，如 http://192.168.5.100:25884
       # - DLNA_BASE_URL=http://192.168.5.100:25884
-      # UNM 解锁服务监听端口（可选，默认 80/443，host 网络模式端口被占时自动跳过 UNM）
-      # - UNM_PORT=80
-      # - UNM_SSL_PORT=443
