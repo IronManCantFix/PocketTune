@@ -156,21 +156,73 @@ const parseDeviceDescription = async (location: string): Promise<DlnaDevice | nu
 };
 
 /**
+ * 发现过程诊断信息（用于远程排查）
+ */
+export interface DlnaDiscoveryDebug {
+  /** 容器内可见的非回环 IPv4 接口（名称与地址） */
+  interfaces: { name: string; ip: string }[];
+  /** 实际使用的组播出接口 */
+  usedInterfaces: string[];
+  /** 绑定的本地端口 */
+  boundPort: number;
+  /** 收到的 SSDP 报文总数 */
+  packetCount: number;
+  /** 其中 M-SEARCH 响应数 */
+  responseCount: number;
+  /** 其中 NOTIFY 通告数 */
+  notifyCount: number;
+  /** 收到的报文样本（前 10 条，含来源与 LOCATION） */
+  packets: string[];
+  /** 看到过的设备描述地址 */
+  locationsSeen: string[];
+  /** 解析成功的设备数 */
+  parsedCount: number;
+  /** 发送与解析过程中的错误 */
+  errors: string[];
+}
+
+/**
  * 扫描局域网 DLNA 渲染器设备
  * 绑定 1900 端口监听 NOTIFY 通告，并发送 M-SEARCH 主动搜索
  * 兼容单播/组播响应与主动通告两种发现方式
  * @param timeout 收集时长（毫秒）
- * @returns 发现的设备列表
+ * @returns 发现的设备列表与诊断信息
  */
-export const discoverDlnaDevices = async (timeout = 3500): Promise<DlnaDevice[]> => {
+export const discoverDlnaDevices = async (
+  timeout = 3500,
+): Promise<{ devices: DlnaDevice[]; debug: DlnaDiscoveryDebug }> => {
   // 候选组播出接口：host 模式取 NAS 真实网卡，bridge 模式含容器网桥地址
   const lanIPs = listLanIPv4s();
+  // 全部非回环 IPv4 接口（诊断用）
+  const allInterfaces: { name: string; ip: string }[] = [];
+  for (const [name, addresses] of Object.entries(os.networkInterfaces())) {
+    for (const addr of addresses ?? []) {
+      if (addr.family === "IPv4" && !addr.internal) {
+        allInterfaces.push({ name, ip: addr.address });
+      }
+    }
+  }
+
   // reuseAddr 允许与其他 UPnP 服务共存绑定 1900 端口
   const socket = dgram.createSocket({ type: "udp4", reuseAddr: true });
   const devices = new Map<string, DlnaDevice>();
   // 待解析与已解析的设备描述地址
   const pending = new Set<string>();
   const locations = new Set<string>();
+
+  // 诊断数据收集
+  const debug: DlnaDiscoveryDebug = {
+    interfaces: allInterfaces,
+    usedInterfaces: lanIPs,
+    boundPort: 0,
+    packetCount: 0,
+    responseCount: 0,
+    notifyCount: 0,
+    packets: [],
+    locationsSeen: [],
+    parsedCount: 0,
+    errors: [],
+  };
 
   // 解析收集到的设备描述地址
   const resolveDevice = async (location: string): Promise<void> => {
@@ -179,15 +231,30 @@ export const discoverDlnaDevices = async (timeout = 3500): Promise<DlnaDevice[]>
     pending.add(location);
     const device = await parseDeviceDescription(location);
     pending.delete(location);
-    if (device) devices.set(device.uuid, device);
+    if (device) {
+      devices.set(device.uuid, device);
+      debug.parsedCount = devices.size;
+      serverLog.info(`✅ 发现渲染器: ${device.name} (${device.location})`);
+    }
   };
 
   // 处理收到的 SSDP 报文：响应与 NOTIFY 均提取 LOCATION
-  socket.on("message", (msg) => {
+  socket.on("message", (msg, rinfo) => {
+    debug.packetCount += 1;
     const text = msg.toString("utf8");
+    const isResponse = text.startsWith("HTTP/1.1 200");
+    if (isResponse) {
+      debug.responseCount += 1;
+    } else if (text.startsWith("NOTIFY")) {
+      debug.notifyCount += 1;
+    }
     // 忽略离线通告
     if (/^NTS:\s*ssdp:byebye/im.test(text)) return;
     const location = text.match(/^LOCATION:\s*(.+)$/im)?.[1]?.trim();
+    // 记录前 10 条报文样本供诊断
+    if (debug.packets.length < 10) {
+      debug.packets.push(`${rinfo.address}:${rinfo.port} | ${isResponse ? "RESPONSE" : "NOTIFY"} | ${location ?? "无LOCATION"}`);
+    }
     if (!location) return;
     void resolveDevice(location);
   });
@@ -209,6 +276,7 @@ export const discoverDlnaDevices = async (timeout = 3500): Promise<DlnaDevice[]>
       socket.bind(SSDP_PORT);
     });
     boundPort = socket.address().port;
+    debug.boundPort = boundPort;
 
     // 加入组播组并逐接口配置，覆盖 NAS 多网卡场景
     if (lanIPs.length > 0) {
@@ -216,10 +284,9 @@ export const discoverDlnaDevices = async (timeout = 3500): Promise<DlnaDevice[]>
         try {
           socket.addMembership(SSDP_ADDR, ip);
         } catch (error) {
-          serverLog.warn(
-            `⚠️ 接口 ${ip} 加入组播组失败:`,
-            error instanceof Error ? error.message : error,
-          );
+          const msg = `接口 ${ip} 加入组播组失败: ${error instanceof Error ? error.message : error}`;
+          debug.errors.push(msg);
+          serverLog.warn(`⚠️ ${msg}`);
         }
       }
       try {
@@ -227,6 +294,8 @@ export const discoverDlnaDevices = async (timeout = 3500): Promise<DlnaDevice[]>
       } catch {
         // 部分环境不支持时忽略
       }
+    } else {
+      debug.errors.push("未检测到可用的内网 IPv4 接口");
     }
 
     // 构造 M-SEARCH 报文（逐接口发送，确保覆盖真实局域网口）
@@ -249,15 +318,16 @@ export const discoverDlnaDevices = async (timeout = 3500): Promise<DlnaDevice[]>
         try {
           if (ip) socket.setMulticastInterface(ip);
         } catch (error) {
-          serverLog.warn(
-            `⚠️ 接口 ${ip} 设置组播出接口失败:`,
-            error instanceof Error ? error.message : error,
-          );
+          const msg = `接口 ${ip} 设置组播出接口失败: ${error instanceof Error ? error.message : error}`;
+          debug.errors.push(msg);
+          serverLog.warn(`⚠️ ${msg}`);
           continue;
         }
         socket.send(buildMSearch(st), SSDP_PORT, SSDP_ADDR, (error) => {
           if (error) {
-            serverLog.warn(`⚠️ SSDP 发送失败 (接口 ${ip || "默认"}, ${st}):`, error.message);
+            const msg = `SSDP 发送失败 (接口 ${ip || "默认"}, ${st}): ${error.message}`;
+            debug.errors.push(msg);
+            serverLog.warn(`⚠️ ${msg}`);
           }
         });
       }
@@ -269,12 +339,14 @@ export const discoverDlnaDevices = async (timeout = 3500): Promise<DlnaDevice[]>
     await new Promise<void>((resolve) => setTimeout(resolve, timeout));
 
     serverLog.info(
-      `📡 SSDP 发现完成（端口 ${boundPort}，接口 ${lanIPs.join(" / ") || "默认"}），共 ${devices.size} 台渲染器`,
+      `📡 SSDP 发现完成（端口 ${boundPort}，接口 ${lanIPs.join(" / ") || "默认"}），收包 ${debug.packetCount}（响应 ${debug.responseCount}/通告 ${debug.notifyCount}），设备 ${devices.size} 台`,
     );
-    return [...devices.values()];
+    return { devices: [...devices.values()], debug };
   } catch (error) {
-    serverLog.error("❌ SSDP 发现失败:", error instanceof Error ? error.message : error);
-    return [];
+    const msg = error instanceof Error ? error.message : String(error);
+    debug.errors.push(`发现流程异常: ${msg}`);
+    serverLog.error("❌ SSDP 发现失败:", msg);
+    return { devices: [...devices.values()], debug };
   } finally {
     try {
       socket.close();

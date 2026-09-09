@@ -46,8 +46,10 @@ export const initDlnaAPI = async (fastify: FastifyInstance): Promise<void> => {
   // 扫描局域网 DLNA 渲染器设备
   fastify.post("/dlna/discover", async (_req: FastifyRequest, reply: FastifyReply) => {
     try {
-      const devices = await discoverDlnaDevices(3500);
+      const { devices, debug } = await discoverDlnaDevices(3500);
       cacheDevices(devices);
+      // 诊断信息同步输出到日志，便于容器内排查
+      serverLog.info("🔍 DLNA 发现诊断:", JSON.stringify(debug));
       return reply.send({
         code: 200,
         data: devices.map((device) => ({
@@ -55,6 +57,7 @@ export const initDlnaAPI = async (fastify: FastifyInstance): Promise<void> => {
           name: device.name,
           deviceType: device.deviceType,
         })),
+        debug,
       });
     } catch (error) {
       serverLog.error("❌ 设备扫描失败:", error);
