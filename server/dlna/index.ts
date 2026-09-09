@@ -96,7 +96,11 @@ export const initDlnaAPI = async (fastify: FastifyInstance): Promise<void> => {
         return reply.code(400).send({ code: 400, message: "不支持的投送地址" });
       }
       try {
-        await withDeviceRetry(uuid, (device) => dlnaSetUriAndPlay(device, targetUrl));
+        await withDeviceRetry(uuid, (device) => {
+          // 记录投送目标与最终拉流地址，便于验证 DLNA_BASE_URL 是否生效
+          serverLog.info(`📤 DLNA 投送: ${device.name} ← ${targetUrl}`);
+          return dlnaSetUriAndPlay(device, targetUrl);
+        });
         return reply.send({ code: 200, message: "投送成功" });
       } catch (error) {
         serverLog.error("❌ 投送失败:", error instanceof Error ? error.message : error);
