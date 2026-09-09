@@ -80,10 +80,16 @@ export const useDlnaStore = defineStore("dlna", {
 
     /**
      * 获取引擎当前播放地址（可投送时返回）
+     * 引擎 src 为 HTMLMediaElement 属性，浏览器会把相对地址解析成绝对地址，
+     * 这里转回相对地址，由后端按 DLNA_BASE_URL 决定电视拉流基址
      */
     getCurrentUrl(): string {
       const audioManager = useAudioManager();
-      const url = audioManager.src;
+      let url = audioManager.src;
+      // 去掉页面 origin 前缀，还原为相对代理地址
+      if (url.startsWith(window.location.origin)) {
+        url = url.slice(window.location.origin.length);
+      }
       return isCastableUrl(url) ? url : "";
     },
 

@@ -19,7 +19,25 @@ import { discoverWithDebug, getDevice, refreshDevices, startDeviceWatcher } from
  */
 const normalizeUrl = (req: FastifyRequest, rawUrl: string): string | null => {
   if (!rawUrl) return null;
-  if (/^https?:\/\//i.test(rawUrl)) return rawUrl;
+  // 绝对地址：优先解析出路径部分，配置了 DLNA_BASE_URL 且原地址与请求同源时强制重写基址
+  if (/^https?:\/\//i.test(rawUrl)) {
+    const baseUrl = process.env.DLNA_BASE_URL?.trim().replace(/\/+$/, "");
+    try {
+      const parsed = new URL(rawUrl);
+      const requestHost = req.headers.host ?? req.hostname;
+      const sameOrigin = parsed.host === requestHost;
+      // 与访问入口同源的代理地址：交给 DLNA_BASE_URL（或请求 host）决定最终基址
+      if (sameOrigin) {
+        if (baseUrl) return `${baseUrl}${parsed.pathname}${parsed.search}`;
+        const protocol = req.protocol ?? "http";
+        return `${protocol}://${requestHost}${parsed.pathname}${parsed.search}`;
+      }
+      // 异源地址（第三方直链等）原样透传
+      return rawUrl;
+    } catch {
+      return rawUrl;
+    }
+  }
   if (rawUrl.startsWith("/")) {
     // 环境变量强制指定基址（如 http://192.168.5.100:25884），电视固定走局域网拉流
     const baseUrl = process.env.DLNA_BASE_URL?.trim().replace(/\/+$/, "");
