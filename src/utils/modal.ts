@@ -626,6 +626,21 @@ export const openStreamingServerConfig = async (
   });
 };
 
+/** 打开 DLNA 投送弹窗 */
+export const openCastModal = async () => {
+  const { default: CastModal } = await import("@/components/Modal/CastModal.vue");
+  window.$modal.create({
+    preset: "card",
+    transformOrigin: "center",
+    autoFocus: false,
+    style: { width: "min(520px, calc(100vw - 32px))" },
+    title: "投送到电视",
+    content: () => {
+      return h(CastModal);
+    },
+  });
+};
+
 /** 打开主题配置弹窗 */
 export const openThemeConfig = async () => {
   if (isModalOpen("themeConfig", "主题配置已打开")) return;

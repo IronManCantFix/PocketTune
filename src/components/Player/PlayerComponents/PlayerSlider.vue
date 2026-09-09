@@ -15,7 +15,7 @@
 </template>
 
 <script setup lang="ts">
-import { useMusicStore, useSettingStore, useStatusStore } from "@/stores";
+import { useMusicStore, useSettingStore, useStatusStore, useDlnaStore } from "@/stores";
 import { msToTime } from "@/utils/time";
 import { usePlayerController } from "@/core/player/PlayerController";
 import { LyricLine } from "@applemusic-like-lyrics/lyric";
@@ -26,6 +26,7 @@ withDefaults(defineProps<{ showTooltip?: boolean }>(), { showTooltip: true });
 const musicStore = useMusicStore();
 const statusStore = useStatusStore();
 const settingStore = useSettingStore();
+const dlnaStore = useDlnaStore();
 
 const player = usePlayerController();
 
@@ -109,6 +110,11 @@ const getCurrentLyric = (value: number) => {
 
 // 调节进度
 const setSeek = (value: number) => {
+  // 投送态下进度调节作用于电视
+  if (dlnaStore.isCasting) {
+    void dlnaStore.seek(value / 1000);
+    return;
+  }
   // 歌词吸附
   if (settingStore.progressAdjustLyric) {
     const lyric = toRaw(musicStore.songLyric.lrcData);
