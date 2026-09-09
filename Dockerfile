@@ -43,8 +43,8 @@ COPY --from=builder /app/docker-entrypoint.sh /docker-entrypoint.sh
 # 部署自包含的 server 运行时（源码 + 生产依赖）
 COPY --from=builder /runtime /app
 
-# 安装 Node 运行时
-RUN apk add --no-cache nodejs \
+# 安装 Node 运行时与 ffmpeg（DLNA 封面视频流合成）
+RUN apk add --no-cache nodejs ffmpeg \
     && sed -i 's/\r$//' /docker-entrypoint.sh \
     && chmod +x /docker-entrypoint.sh
 

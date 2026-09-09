@@ -28,6 +28,8 @@ interface DlnaState {
   tvPlaying: boolean;
   /** 轮询到的电视播放进度（秒） */
   pollPosition: number;
+  /** 切歌联动进行中（防并发） */
+  changingSong: boolean;
 }
 
 /**
@@ -52,6 +54,7 @@ export const useDlnaStore = defineStore("dlna", {
     isCasting: false,
     tvPlaying: false,
     pollPosition: 0,
+    changingSong: false,
   }),
   getters: {
     /** 当前投送目标设备 */
@@ -108,7 +111,7 @@ export const useDlnaStore = defineStore("dlna", {
       }
       try {
         this.activeUuid = uuid;
-        await dlnaPlay(uuid, url);
+        await dlnaPlay(uuid, url, this.getCurrentCover());
         this.isCasting = true;
         this.tvPlaying = true;
         this.castingSongId = currentSong?.id ?? null;
@@ -124,17 +127,27 @@ export const useDlnaStore = defineStore("dlna", {
     },
 
     /**
+     * 获取当前歌曲封面（完整尺寸，用于视频流合成）
+     */
+    getCurrentCover(): string {
+      const musicStore = useMusicStore();
+      const cover = musicStore.playSong?.coverSize?.l || musicStore.playSong?.cover || "";
+      return cover;
+    },
+
+    /**
      * 投送指定地址到当前设备（切歌联动）
      * @param url 媒体地址
      * @param songId 歌曲 id
+     * @param cover 封面地址（视频流合成用）
      */
-    async castUrl(url: string, songId: number): Promise<boolean> {
+    async castUrl(url: string, songId: number, cover?: string): Promise<boolean> {
       const musicStore = useMusicStore();
       const statusStore = useStatusStore();
       if (!this.isCasting || !this.activeUuid) return false;
       if (!isCastableUrl(url)) return false;
       try {
-        await dlnaPlay(this.activeUuid, url);
+        await dlnaPlay(this.activeUuid, url, cover);
         this.castingSongId = songId ?? null;
         this.castingSongName = musicStore.playSong?.name ?? "";
         statusStore.playStatus = true;
@@ -244,19 +257,42 @@ export const useDlnaStore = defineStore("dlna", {
     },
 
     /**
-     * 处理切歌联动：若处于投送态，自动将新歌投送到当前设备
+     * 等待引擎加载出可投送的新歌地址
+     * 切歌后需要等网络解析完成（loadAndPlay 更新 src），轮询直到就绪或超时
+     * @param timeout 超时（毫秒）
+     */
+    async waitForCastableUrl(timeout = 10000): Promise<string> {
+      const start = Date.now();
+      while (Date.now() - start < timeout) {
+        const url = this.getCurrentUrl();
+        if (url) return url;
+        await new Promise((resolve) => setTimeout(resolve, 300));
+      }
+      return "";
+    },
+
+    /**
+     * 处理切歌联动：若处于投送态，等待新歌地址就绪后自动投送
      * @param songId 新歌 id
      */
     async handleSongChange(songId: number): Promise<void> {
       if (!this.isCasting || !this.activeUuid) return;
       // 同一首歌不重复投送
       if (songId != null && this.castingSongId === songId) return;
-      const url = this.getCurrentUrl();
-      if (!url) {
-        window.$message.warning("当前歌曲暂不支持投送（本地文件或实时流）");
-        return;
+      // 防止与上一次切换的投送并发
+      if (this.changingSong) return;
+      this.changingSong = true;
+      try {
+        // 切歌后引擎 src 需要重新加载，轮询等待新歌地址就绪
+        const url = await this.waitForCastableUrl(10000);
+        if (!url) {
+          window.$message.warning("新歌地址加载超时，请手动断开后重新投送");
+          return;
+        }
+        await this.castUrl(url, songId, this.getCurrentCover());
+      } finally {
+        this.changingSong = false;
       }
-      await this.castUrl(url, songId);
     },
   },
   persist: {

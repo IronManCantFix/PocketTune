@@ -11,6 +11,9 @@ import {
   dlnaGetStatus,
 } from "./avtransport";
 import { discoverWithDebug, getDevice, refreshDevices, startDeviceWatcher } from "./deviceManager";
+import { ensureCoverMedia, getMediaFile } from "./media";
+import { createReadStream, existsSync, statSync } from "node:fs";
+import type { Readable } from "node:stream";
 
 /**
  * 归一化投送地址为渲染器可访问的绝对地址
@@ -104,14 +107,39 @@ export const initDlnaAPI = async (fastify: FastifyInstance): Promise<void> => {
   // 投送媒体到目标设备并播放
   fastify.post(
     "/dlna/play",
-    async (req: FastifyRequest<{ Body: { uuid?: string; url?: string } }>, reply: FastifyReply) => {
-      const { uuid, url } = req.body ?? {};
+    async (
+      req: FastifyRequest<{
+        Body: { uuid?: string; url?: string; cover?: string };
+      }>,
+      reply: FastifyReply,
+    ) => {
+      const { uuid, url, cover } = req.body ?? {};
       if (!uuid || !url) {
         return reply.code(400).send({ code: 400, message: "缺少 uuid 或 url 参数" });
       }
-      const targetUrl = normalizeUrl(req, url);
+      let targetUrl = normalizeUrl(req, url);
       if (!targetUrl) {
         return reply.code(400).send({ code: 400, message: "不支持的投送地址" });
+      }
+      // 封面视频模式：合成封面 + 音频的视频流，电视全屏显示封面（失败降级纯音频）
+      if (cover) {
+        const coverAbsolute = normalizeUrl(req, cover) ?? cover;
+        try {
+          const mediaUrl = await ensureCoverMedia(targetUrl, coverAbsolute);
+          if (mediaUrl) {
+            // 生成的媒体走相对地址，再次经过 normalizeUrl 补全电视可达基址
+            const videoUrl = normalizeUrl(req, mediaUrl);
+            if (videoUrl) {
+              targetUrl = videoUrl;
+              serverLog.info("🎬 封面视频模式已启用");
+            }
+          }
+        } catch (error) {
+          serverLog.warn(
+            "⚠️ 封面视频合成异常，降级纯音频:",
+            error instanceof Error ? error.message : error,
+          );
+        }
       }
       try {
         await withDeviceRetry(uuid, (device) => {
@@ -127,6 +155,52 @@ export const initDlnaAPI = async (fastify: FastifyInstance): Promise<void> => {
           message: `投送失败: ${error instanceof Error ? error.message : "未知错误"}`,
         });
       }
+    },
+  );
+
+  // 封面视频流：电视拉流端点（支持 Range 拖动进度）
+  fastify.get(
+    "/dlna/media",
+    async (req: FastifyRequest<{ Querystring: { token?: string } }>, reply: FastifyReply) => {
+      const token = req.query.token ?? "";
+      const file = getMediaFile(token);
+      if (!file || !existsSync(file)) {
+        return reply.code(404).send({ code: 404, message: "媒体不存在或已过期" });
+      }
+      const size = statSync(file).size;
+      const range = req.headers.range;
+      // 基础响应头：禁用 nginx 缓冲，保证流式推给电视
+      const baseHeaders: Record<string, string> = {
+        "Content-Type": "video/mp4",
+        "Accept-Ranges": "bytes",
+        "Cache-Control": "no-store",
+        "X-Accel-Buffering": "no",
+      };
+      if (range) {
+        // 解析 bytes=start-end
+        const match = /^bytes=(\d*)-(\d*)$/.exec(range);
+        if (match) {
+          const start = match[1] ? Number(match[1]) : 0;
+          const end = match[2] ? Math.min(Number(match[2]), size - 1) : size - 1;
+          if (Number.isNaN(start) || Number.isNaN(end) || start > end || start >= size) {
+            return reply.code(416).header("Content-Range", `bytes */${size}`).send();
+          }
+          const stream = createReadStream(file, { start, end });
+          return reply
+            .code(206)
+            .headers({
+              ...baseHeaders,
+              "Content-Range": `bytes ${start}-${end}/${size}`,
+              "Content-Length": String(end - start + 1),
+            })
+            .send(stream as unknown as Readable);
+        }
+      }
+      // 无 Range：全量返回
+      return reply
+        .code(200)
+        .headers({ ...baseHeaders, "Content-Length": String(size) })
+        .send(createReadStream(file) as unknown as Readable);
     },
   );
 

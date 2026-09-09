@@ -44,13 +44,14 @@ export const dlnaDiscover = async (): Promise<DlnaDeviceInfo[]> => {
  * 投送媒体到目标设备并播放
  * @param uuid 设备 id
  * @param url 媒体地址（相对地址可由服务端补全为绝对地址）
+ * @param cover 封面地址（可选，传入时服务端合成封面视频流，电视全屏显示）
  */
-export const dlnaPlay = async (uuid: string, url: string): Promise<void> => {
+export const dlnaPlay = async (uuid: string, url: string, cover?: string): Promise<void> => {
   await request<{ code: number; message?: string }>({
     baseURL: "/api",
     url: "/dlna/play",
     method: "post",
-    data: { uuid, url },
+    data: cover ? { uuid, url, cover } : { uuid, url },
   });
 };
 
