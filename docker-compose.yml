@@ -28,3 +28,9 @@ services:
       - SELECT_MAX_BR=true
       - LOG_LEVEL=info
       - SEARCH_ALBUM=true
+      # DLNA 投送固定拉流基址（可选）：使用域名访问时建议配置为内网地址，
+      # 使电视始终走局域网拉流，与访问入口解耦，如 http://192.168.5.100:25884
+      # - DLNA_BASE_URL=http://192.168.5.100:25884
+      # UNM 解锁服务监听端口（可选，默认 80/443，host 网络模式端口被占时自动跳过 UNM）
+      # - UNM_PORT=80
+      # - UNM_SSL_PORT=443

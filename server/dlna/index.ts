@@ -14,12 +14,16 @@ import { discoverWithDebug, getDevice, refreshDevices, startDeviceWatcher } from
 
 /**
  * 归一化投送地址为渲染器可访问的绝对地址
- * 相对路径（同源代理）用请求 host 补全
+ * 优先使用 DLNA_BASE_URL 环境变量（固定基址，与访问入口解耦）
+ * 未配置时用请求 host 补全（默认行为）
  */
 const normalizeUrl = (req: FastifyRequest, rawUrl: string): string | null => {
   if (!rawUrl) return null;
   if (/^https?:\/\//i.test(rawUrl)) return rawUrl;
   if (rawUrl.startsWith("/")) {
+    // 环境变量强制指定基址（如 http://192.168.5.100:25884），电视固定走局域网拉流
+    const baseUrl = process.env.DLNA_BASE_URL?.trim().replace(/\/+$/, "");
+    if (baseUrl) return `${baseUrl}${rawUrl}`;
     const protocol = req.protocol ?? "http";
     const host = req.headers.host ?? req.hostname;
     return `${protocol}://${host}${rawUrl}`;

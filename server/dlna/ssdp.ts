@@ -228,6 +228,7 @@ export const discoverDlnaDevices = async (
   const resolveDevice = async (location: string): Promise<void> => {
     if (locations.has(location) || pending.has(location)) return;
     locations.add(location);
+    debug.locationsSeen = [...locations];
     pending.add(location);
     const device = await parseDeviceDescription(location);
     pending.delete(location);
