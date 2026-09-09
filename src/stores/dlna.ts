@@ -7,6 +7,7 @@ import {
   dlnaStatus,
   type DlnaDeviceInfo,
   type DlnaTransportState,
+  type DlnaLyricLine,
 } from "@/api/dlna";
 import { useAudioManager } from "@/core/player/AudioManager";
 import { useMusicStore, useStatusStore } from "@/stores";
@@ -111,7 +112,7 @@ export const useDlnaStore = defineStore("dlna", {
       }
       try {
         this.activeUuid = uuid;
-        await dlnaPlay(uuid, url, this.getCurrentCover());
+        await dlnaPlay(uuid, url, this.getCurrentCover(), this.getCastMeta());
         this.isCasting = true;
         this.tvPlaying = true;
         this.castingSongId = currentSong?.id ?? null;
@@ -136,6 +137,32 @@ export const useDlnaStore = defineStore("dlna", {
     },
 
     /**
+     * 收集投送元数据（歌名/歌手/歌词，封面视频烧录字幕用）
+     */
+    getCastMeta(): { title?: string; artist?: string; lyrics?: DlnaLyricLine[] } {
+      const musicStore = useMusicStore();
+      const song = musicStore.playSong;
+      const artistName = Array.isArray(song?.artists)
+        ? song.artists.map((a) => a.name).join(" / ")
+        : (song?.artists as string) || "";
+      // 歌词行精简转换（仅保留字幕所需字段）
+      const lines = musicStore.songLyric?.lrcData ?? [];
+      const lyrics: DlnaLyricLine[] = lines
+        .filter((line) => line.words?.length)
+        .map((line) => ({
+          startTime: line.startTime,
+          endTime: line.endTime,
+          words: line.words.map((w) => w.word).join(""),
+          translatedLyric: line.translatedLyric || undefined,
+        }));
+      return {
+        title: song?.name,
+        artist: artistName,
+        lyrics: lyrics.length > 0 ? lyrics : undefined,
+      };
+    },
+
+    /**
      * 投送指定地址到当前设备（切歌联动）
      * @param url 媒体地址
      * @param songId 歌曲 id
@@ -147,7 +174,7 @@ export const useDlnaStore = defineStore("dlna", {
       if (!this.isCasting || !this.activeUuid) return false;
       if (!isCastableUrl(url)) return false;
       try {
-        await dlnaPlay(this.activeUuid, url, cover);
+        await dlnaPlay(this.activeUuid, url, cover, this.getCastMeta());
         this.castingSongId = songId ?? null;
         this.castingSongName = musicStore.playSong?.name ?? "";
         statusStore.playStatus = true;

@@ -109,11 +109,23 @@ export const initDlnaAPI = async (fastify: FastifyInstance): Promise<void> => {
     "/dlna/play",
     async (
       req: FastifyRequest<{
-        Body: { uuid?: string; url?: string; cover?: string };
+        Body: {
+          uuid?: string;
+          url?: string;
+          cover?: string;
+          title?: string;
+          artist?: string;
+          lyrics?: {
+            startTime: number;
+            endTime: number;
+            words: string;
+            translatedLyric?: string;
+          }[];
+        };
       }>,
       reply: FastifyReply,
     ) => {
-      const { uuid, url, cover } = req.body ?? {};
+      const { uuid, url, cover, title, artist, lyrics } = req.body ?? {};
       if (!uuid || !url) {
         return reply.code(400).send({ code: 400, message: "缺少 uuid 或 url 参数" });
       }
@@ -121,11 +133,14 @@ export const initDlnaAPI = async (fastify: FastifyInstance): Promise<void> => {
       if (!targetUrl) {
         return reply.code(400).send({ code: 400, message: "不支持的投送地址" });
       }
-      // 封面视频模式：合成封面 + 音频的视频流，电视全屏显示封面（失败降级纯音频）
+      // 封面视频模式：合成封面 + 音频的视频流，电视全屏显示封面与歌词（失败降级纯音频）
       if (cover) {
         const coverAbsolute = normalizeUrl(req, cover) ?? cover;
         try {
-          const mediaUrl = await ensureCoverMedia(targetUrl, coverAbsolute);
+          const mediaUrl = await ensureCoverMedia(targetUrl, coverAbsolute, lyrics, {
+            title,
+            artist,
+          });
           if (mediaUrl) {
             // 生成的媒体走相对地址，再次经过 normalizeUrl 补全电视可达基址
             const videoUrl = normalizeUrl(req, mediaUrl);
