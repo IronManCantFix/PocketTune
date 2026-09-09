@@ -1,7 +1,7 @@
-// DLNA 局域网投送 API：设备发现、投送与控制
+// DLNA 局域网投送 API：设备发现、投送与控制（含失败自动刷新重试）
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { serverLog } from "../utils/logger";
-import { discoverDlnaDevices, type DlnaDevice } from "./ssdp";
+import type { DlnaDevice } from "./ssdp";
 import {
   dlnaSetUriAndPlay,
   dlnaPause,
@@ -10,15 +10,7 @@ import {
   dlnaSeek,
   dlnaGetStatus,
 } from "./avtransport";
-
-// 设备缓存：扫描后记录，供投送与控制使用
-const deviceCache = new Map<string, DlnaDevice>();
-
-// 将发现的设备写入缓存
-const cacheDevices = (devices: DlnaDevice[]): void => {
-  deviceCache.clear();
-  devices.forEach((device) => deviceCache.set(device.uuid, device));
-};
+import { discoverWithDebug, getDevice, refreshDevices, startDeviceWatcher } from "./deviceManager";
 
 /**
  * 归一化投送地址为渲染器可访问的绝对地址
@@ -35,20 +27,42 @@ const normalizeUrl = (req: FastifyRequest, rawUrl: string): string | null => {
   return null;
 };
 
-// 按 uuid 获取设备，不存在则报错
-const getDevice = (uuid: string): DlnaDevice | null => deviceCache.get(uuid) ?? null;
+/**
+ * 带自动恢复的设备指令执行
+ * 首次失败（控制地址过期/服务重启）时重新扫描设备并重试一次
+ */
+const withDeviceRetry = async <T>(
+  uuid: string,
+  action: (device: DlnaDevice) => Promise<T>,
+): Promise<T> => {
+  const device = await getDevice(uuid);
+  if (!device) throw new Error("设备不在线，请重新扫描");
+  try {
+    return await action(device);
+  } catch (error) {
+    // 重新扫描刷新设备信息（电视服务可能已换端口）后重试一次
+    serverLog.warn(
+      `⚠️ 指令首次执行失败，尝试刷新设备后重试: ${error instanceof Error ? error.message : error}`,
+    );
+    await refreshDevices(true);
+    const fresh = await getDevice(uuid);
+    if (!fresh) throw error;
+    return await action(fresh);
+  }
+};
 
 /**
  * 初始化 DLNA API
  * 注册路由：/dlna/discover /dlna/play /dlna/control /dlna/status
  */
 export const initDlnaAPI = async (fastify: FastifyInstance): Promise<void> => {
+  // 启动设备信息自动刷新（跟踪电视服务端口变化）
+  startDeviceWatcher();
+
   // 扫描局域网 DLNA 渲染器设备
   fastify.post("/dlna/discover", async (_req: FastifyRequest, reply: FastifyReply) => {
     try {
-      const { devices, debug } = await discoverDlnaDevices(3500);
-      cacheDevices(devices);
-      // 诊断信息同步输出到日志，便于容器内排查
+      const { devices, debug } = await discoverWithDebug();
       serverLog.info("🔍 DLNA 发现诊断:", JSON.stringify(debug));
       return reply.send({
         code: 200,
@@ -73,16 +87,12 @@ export const initDlnaAPI = async (fastify: FastifyInstance): Promise<void> => {
       if (!uuid || !url) {
         return reply.code(400).send({ code: 400, message: "缺少 uuid 或 url 参数" });
       }
-      const device = getDevice(uuid);
-      if (!device) {
-        return reply.code(404).send({ code: 404, message: "设备不在线，请重新扫描" });
-      }
       const targetUrl = normalizeUrl(req, url);
       if (!targetUrl) {
         return reply.code(400).send({ code: 400, message: "不支持的投送地址" });
       }
       try {
-        await dlnaSetUriAndPlay(device, targetUrl);
+        await withDeviceRetry(uuid, (device) => dlnaSetUriAndPlay(device, targetUrl));
         return reply.send({ code: 200, message: "投送成功" });
       } catch (error) {
         serverLog.error("❌ 投送失败:", error instanceof Error ? error.message : error);
@@ -107,37 +117,33 @@ export const initDlnaAPI = async (fastify: FastifyInstance): Promise<void> => {
       if (!uuid || !action) {
         return reply.code(400).send({ code: 400, message: "缺少 uuid 或 action 参数" });
       }
-      const device = getDevice(uuid);
-      if (!device) {
-        return reply.code(404).send({ code: 404, message: "设备不在线，请重新扫描" });
-      }
       try {
-        switch (action) {
-          case "pause":
-            await dlnaPause(device);
-            break;
-          case "resume":
-            await dlnaResume(device);
-            break;
-          case "stop":
-            await dlnaStop(device);
-            break;
-          case "seek":
-            if (typeof value !== "number" || value < 0) {
-              return reply.code(400).send({ code: 400, message: "缺少有效的 seek 时间" });
-            }
-            await dlnaSeek(device, value);
-            break;
-          default:
-            return reply.code(400).send({ code: 400, message: `不支持的指令: ${action}` });
-        }
+        await withDeviceRetry(uuid, (device) => {
+          switch (action) {
+            case "pause":
+              return dlnaPause(device);
+            case "resume":
+              return dlnaResume(device);
+            case "stop":
+              return dlnaStop(device);
+            case "seek":
+              if (typeof value !== "number" || value < 0) {
+                throw new Error("缺少有效的 seek 时间");
+              }
+              return dlnaSeek(device, value);
+            default:
+              throw new Error(`不支持的指令: ${action}`);
+          }
+        });
         return reply.send({ code: 200, message: "指令已下发" });
       } catch (error) {
         serverLog.error("❌ 控制失败:", error instanceof Error ? error.message : error);
-        return reply.code(502).send({
-          code: 502,
-          message: `控制失败: ${error instanceof Error ? error.message : "未知错误"}`,
-        });
+        const message = error instanceof Error ? error.message : "未知错误";
+        // 参数类错误返回 400，其余视为设备通信失败
+        const isParamError = message.includes("不支持的指令") || message.includes("seek 时间");
+        return reply
+          .code(isParamError ? 400 : 502)
+          .send({ code: isParamError ? 400 : 502, message: `控制失败: ${message}` });
       }
     },
   );
@@ -150,12 +156,8 @@ export const initDlnaAPI = async (fastify: FastifyInstance): Promise<void> => {
       if (!uuid) {
         return reply.code(400).send({ code: 400, message: "缺少 uuid 参数" });
       }
-      const device = getDevice(uuid);
-      if (!device) {
-        return reply.code(404).send({ code: 404, message: "设备不在线，请重新扫描" });
-      }
       try {
-        const state = await dlnaGetStatus(device);
+        const state = await withDeviceRetry(uuid, (device) => dlnaGetStatus(device));
         return reply.send({ code: 200, data: state });
       } catch (error) {
         serverLog.error("❌ 状态查询失败:", error instanceof Error ? error.message : error);

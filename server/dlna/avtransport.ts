@@ -1,5 +1,6 @@
 // AVTransport 服务 SOAP 控制：向 DLNA 渲染器发送播放控制指令
-import axios from "axios";
+import axios, { type AxiosResponse } from "axios";
+import { serverLog } from "../utils/logger";
 import type { DlnaDevice } from "./ssdp";
 
 // SOAP 命名空间
@@ -64,14 +65,30 @@ const soapRequest = async (
     "</s:Envelope>",
   ].join("");
 
-  const res = await axios.post<string>(device.controlUrl, envelope, {
-    timeout: 8000,
-    headers: {
-      "Content-Type": 'text/xml; charset="utf-8"',
-      SOAPAction: `"urn:schemas-upnp-org:service:AVTransport:1#${action}"`,
-      "User-Agent": "PocketTune-DLNA/1.0",
-    },
-  });
+  let res: AxiosResponse<string>;
+  try {
+    res = await axios.post<string>(device.controlUrl, envelope, {
+      timeout: 8000,
+      headers: {
+        "Content-Type": 'text/xml; charset="utf-8"',
+        SOAPAction: `"urn:schemas-upnp-org:service:AVTransport:1#${action}"`,
+        "User-Agent": "PocketTune-DLNA/1.0",
+      },
+    });
+  } catch (error) {
+    // 带出渲染器返回的具体错误体，便于诊断（端口失效/服务重启等）
+    if (axios.isAxiosError(error)) {
+      const body = String(error.response?.data ?? "").slice(0, 300);
+      serverLog.error(
+        `❌ SOAP ${action} HTTP 错误: ${error.response?.status ?? "无响应"} 设备: ${device.name} 控制地址: ${device.controlUrl} 响应体: ${body}`,
+      );
+      const err = new Error(
+        `SOAP ${action} HTTP ${error.response?.status ?? "无响应"}: ${body || error.message}`,
+      );
+      throw err;
+    }
+    throw error;
+  }
 
   // SOAP 错误也可能返回 200，需检查 Fault
   if (res.data.includes("<s:Fault>") || res.data.includes("<s:fault>")) {

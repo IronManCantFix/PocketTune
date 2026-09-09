@@ -253,7 +253,9 @@ export const discoverDlnaDevices = async (
     const location = text.match(/^LOCATION:\s*(.+)$/im)?.[1]?.trim();
     // 记录前 10 条报文样本供诊断
     if (debug.packets.length < 10) {
-      debug.packets.push(`${rinfo.address}:${rinfo.port} | ${isResponse ? "RESPONSE" : "NOTIFY"} | ${location ?? "无LOCATION"}`);
+      debug.packets.push(
+        `${rinfo.address}:${rinfo.port} | ${isResponse ? "RESPONSE" : "NOTIFY"} | ${location ?? "无LOCATION"}`,
+      );
     }
     if (!location) return;
     void resolveDevice(location);
