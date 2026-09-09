@@ -100,7 +100,18 @@ const soapRequest = async (
 };
 
 /**
+ * SOAP 参数值转义（URL 中的 &、< 等特殊字符）
+ */
+const escapeSoapValue = (value: string): string =>
+  value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+
+// 延时工具
+const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
  * 设置渲染器播放地址并播放
+ * SetURI 后电视需要时间切换流，Play 延后执行；Play 失败降级为日志
+ * （部分渲染器忙于拉流时直接挂断连接，多数收到 URI 后也会自动开播）
  * @param device 目标设备
  * @param url 媒体绝对地址
  * @param meta 媒体元数据（可选，DIDL-Lite XML）
@@ -112,10 +123,19 @@ export const dlnaSetUriAndPlay = async (
 ): Promise<void> => {
   await soapRequest(device, "SetAVTransportURI", {
     InstanceID: "0",
-    CurrentURI: url,
-    CurrentURIMetaData: meta || "",
+    CurrentURI: escapeSoapValue(url),
+    CurrentURIMetaData: escapeSoapValue(meta || ""),
   });
-  await soapRequest(device, "Play", { InstanceID: "0", Speed: "1" });
+  // 等待渲染器完成拉流准备，避免 Play 被忙状态的栈挂断
+  await sleep(1500);
+  try {
+    await soapRequest(device, "Play", { InstanceID: "0", Speed: "1" });
+  } catch (error) {
+    // Play 失败不阻断流程：渲染器很可能已自动开播，由状态轮询反映真实情况
+    serverLog.warn(
+      `⚠️ Play 指令失败（不阻断，可能已自动开播）: ${error instanceof Error ? error.message : error}`,
+    );
+  }
 };
 
 /**
