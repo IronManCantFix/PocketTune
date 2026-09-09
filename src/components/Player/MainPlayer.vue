@@ -177,7 +177,7 @@
         strong
         secondary
         circle
-        @click.stop="player.playOrPause()"
+        @click.stop="handlePlayOrPause"
       >
         <template #icon>
           <Transition name="fade" mode="out-in">
@@ -241,6 +241,7 @@
           </n-flex>
         </Transition>
         <!-- 功能区 -->
+        <CastControl />
         <PlayerRightMenu />
       </n-flex>
     </Transition>
@@ -250,7 +251,13 @@
 <script setup lang="ts">
 import { usePlayerController } from "@/core/player/PlayerController";
 import { useSongManager } from "@/core/player/SongManager";
-import { useDataStore, useMusicStore, useSettingStore, useStatusStore } from "@/stores";
+import {
+  useDataStore,
+  useMusicStore,
+  useSettingStore,
+  useStatusStore,
+  useDlnaStore,
+} from "@/stores";
 import { toLikeSong } from "@/utils/auth";
 import { useTimeFormat } from "@/composables/useTimeFormat";
 import { useSwipe } from "@vueuse/core";
@@ -272,9 +279,19 @@ const dataStore = useDataStore();
 const musicStore = useMusicStore();
 const statusStore = useStatusStore();
 const settingStore = useSettingStore();
+const dlnaStore = useDlnaStore();
 
 const player = usePlayerController();
 const songManager = useSongManager();
+
+// 播放/暂停：投送态下作用于电视，否则作用于本地
+const handlePlayOrPause = () => {
+  if (dlnaStore.isCasting) {
+    void dlnaStore.togglePlay();
+    return;
+  }
+  void player.playOrPause();
+};
 
 const { timeDisplay, toggleTimeFormat } = useTimeFormat();
 

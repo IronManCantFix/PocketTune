@@ -177,4 +177,36 @@ onUnmounted(stopPolling);
     }
   }
 }
+
+// 移动端（全屏播放器顶部栏）适配：按钮圆形、状态条紧凑
+.cast-btn.cast-mobile {
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border-radius: 50%;
+
+  .n-icon {
+    color: rgb(var(--main-cover-color));
+    opacity: 0.8;
+  }
+
+  &:active {
+    background-color: rgba(255, 255, 255, 0.1);
+  }
+}
+
+.cast-bar.cast-mobile {
+  padding: 4px 6px 4px 10px;
+  border-color: rgba(255, 255, 255, 0.35);
+  background-color: rgba(0, 0, 0, 0.25);
+
+  .cast-active-icon,
+  .cast-name {
+    color: rgb(var(--main-cover-color));
+  }
+
+  .cast-name {
+    max-width: 56px;
+  }
+}
 </style>
