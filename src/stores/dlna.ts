@@ -27,6 +27,8 @@ const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout
 
 // 轮询防重入标记：上一轮请求未结束时跳过本轮，避免超时挂起时请求堆积
 let syncInFlight = false;
+// 上次进度偏差再同步时间（限频，防止 seek 风暴）
+let lastProgressAlignAt = 0;
 
 interface DlnaState {
   /** 发现的设备列表 */
@@ -622,9 +624,12 @@ export const useDlnaStore = defineStore("dlna", {
           this.pollPosition = state.currentTime;
           this.tvPlaying = state.playing;
           const statusStore = useStatusStore();
+          // 电视已播到尾部：不镜像暂停本地，让本地引擎自然播完触发 ended，
+          // 走正常的自动切歌链路（否则本地永远到不了结尾，自动切歌卡死）
+          const tvNearEnd = state.duration > 0 && state.currentTime >= state.duration - 5;
           // 本地以静音方式镜像电视播放，进度/歌词由本地引擎天然驱动，无需回写
           // 电视端状态变化（用户用电视遥控暂停/恢复）时镜像到本地引擎
-          if (state.playing !== statusStore.playStatus) {
+          if (state.playing !== statusStore.playStatus && !(!state.playing && tvNearEnd)) {
             statusStore.playStatus = state.playing;
             try {
               if (state.playing) {
@@ -646,6 +651,21 @@ export const useDlnaStore = defineStore("dlna", {
             }
             if (state.muted != null) {
               this.tvMuted = state.muted;
+            }
+          }
+          // 进度偏差再同步：投送初期本地加载慢于电视等场景会让一次性对齐扑空，
+          // 漂移超过阈值时把本地拉回电视进度（限频，尾部交给自动切歌处理）
+          const now = Date.now();
+          if (
+            state.playing &&
+            !tvNearEnd &&
+            state.currentTime > 0 &&
+            now - lastProgressAlignAt > 8000
+          ) {
+            const drift = Math.abs(state.currentTime * 1000 - statusStore.currentTime);
+            if (drift > 3000) {
+              lastProgressAlignAt = now;
+              usePlayerController().setSeek(Math.floor(state.currentTime * 1000));
             }
           }
         } else {
