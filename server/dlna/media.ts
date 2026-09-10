@@ -70,7 +70,9 @@ export interface LyricLineInput {
 }
 
 /**
- * 生成 ASS 字幕（后端精简版，画面布局：底部歌词 + 顶部歌名/歌手）
+ * 生成 ASS 字幕（后端精简版）
+ * KTV 风格：当前句白色大字（含翻译小字）+ 下一句灰色预览，随播放逐句滚动
+ * 顶部常显歌名/歌手
  */
 const generateLyricAss = (
   lines: LyricLineInput[],
@@ -86,8 +88,8 @@ PlayResY: 720
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Lyric,Noto Sans CJK SC,34,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,1,0,0,0,100,100,0,0,1,2,1,2,20,20,30,1
-Style: Meta,Noto Sans CJK SC,24,&H50FFFFFF,&H000000FF,&H00000000,&H80000000,0,0,0,0,100,100,0,0,1,1,1,8,20,20,20,1
+Style: Lyric,Noto Sans CJK SC,46,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,1,0,0,0,100,100,0,0,1,3,1,2,24,24,36,1
+Style: Meta,Noto Sans CJK SC,26,&H50FFFFFF,&H000000FF,&H00000000,&H80000000,0,0,0,0,100,100,0,0,1,1,1,8,24,24,24,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
@@ -98,16 +100,27 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
   events.push(
     `Dialogue: 0,0:00:00.00,9:59:59.00,Meta,,0,0,0,,${(meta.title ?? "") + " - " + (meta.artist ?? "")}`,
   );
-  for (const line of lines) {
-    const text = line.words?.trim();
-    if (!text) continue;
-    const parts = [text.replace(/\r?\n/g, "\\N")];
-    if (line.translatedLyric) {
-      parts.push(line.translatedLyric.replace(/\r?\n/g, "\\N"));
+
+  // 逐句生成：当前句（亮白，含翻译小字）+ 下一句（灰色预览）同框显示
+  for (let i = 0; i < lines.length; i += 1) {
+    const current = lines[i];
+    const next = lines[i + 1];
+    const currentText = current.words?.trim();
+    if (!currentText) continue;
+
+    // 组装文本：当前句（白色）→ 翻译（小字浅灰）→ 下一句（灰色预览）
+    let text = currentText;
+    if (current.translatedLyric?.trim()) {
+      text += `{\\fs30\\c&HD0D0D0&}\\N${current.translatedLyric.trim()}`;
     }
-    events.push(
-      `Dialogue: 0,${formatAssTime(line.startTime)},${formatAssTime(line.endTime)},Lyric,,0,0,0,,${parts.join("\\N")}`,
-    );
+    if (next?.words?.trim()) {
+      text += `{\\r\\c&H787878&\\fs46}\\N${next.words.trim()}`;
+    }
+
+    // 当前句显示到下一句开始（无缝衔接），末句多显示 3 秒兜底
+    const start = formatAssTime(current.startTime);
+    const end = formatAssTime(next ? next.startTime : current.endTime + 3000);
+    events.push(`Dialogue: 0,${start},${end},Lyric,,0,0,0,,${text}`);
   }
   return header + events.join("\n") + "\n";
 };

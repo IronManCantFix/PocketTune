@@ -70,31 +70,16 @@ const handleDisconnect = async () => {
   }
 };
 
-// 投送成功后暂停本地，由电视独占出声
-watch(
-  () => dlnaStore.isCasting,
-  (casting, prev) => {
-    if (casting && !prev && statusStore.playStatus) {
-      player.pause();
-    }
-  },
-);
+// 投送成功后本地静音由 store（castTo/castUrl）统一处理，此处不再重复补偿
 
-// 切歌联动：投送态下自动把新歌投送到电视，并保持本地暂停
+// 切歌联动：投送态下自动把新歌投送到电视
 watch(
   () => musicStore.playSong.id,
   (songId, prev) => {
     if (songId == null) return;
     if (prev == null || songId === prev) return;
     if (dlnaStore.isCasting) {
-      // 重投电视
       void dlnaStore.handleSongChange(songId);
-      // 本地可能在切歌时自动播放，补偿暂停
-      window.setTimeout(() => {
-        if (dlnaStore.isCasting && statusStore.playStatus) {
-          player.pause();
-        }
-      }, 500);
     }
   },
 );

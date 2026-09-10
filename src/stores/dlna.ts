@@ -10,6 +10,7 @@ import {
   type DlnaLyricLine,
 } from "@/api/dlna";
 import { useAudioManager } from "@/core/player/AudioManager";
+import { usePlayerController } from "@/core/player/PlayerController";
 import { useMusicStore, useStatusStore } from "@/stores";
 
 interface DlnaState {
@@ -98,12 +99,22 @@ export const useDlnaStore = defineStore("dlna", {
     },
 
     /**
+     * 投送成功后的本地状态收尾：暂停本地播放（避免手机与电视同时出声），并同步电视状态
+     */
+    pauseLocalAndSyncTv(): void {
+      const audioManager = useAudioManager();
+      // 暂停本地引擎（会同步触发引擎 pause 事件，重置 playStatus），随后覆盖为电视状态
+      audioManager.pause();
+      useStatusStore().playStatus = true;
+      usePlayerController().syncMediaPlayMode?.();
+    },
+
+    /**
      * 投送当前歌曲到指定设备
      * @param uuid 目标设备 id
      */
     async castTo(uuid: string): Promise<boolean> {
       const musicStore = useMusicStore();
-      const statusStore = useStatusStore();
       const currentSong = musicStore.playSong;
       const url = this.getCurrentUrl();
       if (!url) {
@@ -117,8 +128,8 @@ export const useDlnaStore = defineStore("dlna", {
         this.tvPlaying = true;
         this.castingSongId = currentSong?.id ?? null;
         this.castingSongName = currentSong?.name ?? "";
-        // 同步本地播放状态为播放中，让播放按钮图标与电视一致
-        statusStore.playStatus = true;
+        // 投送成功：本地立即静音，由电视独占出声
+        this.pauseLocalAndSyncTv();
         return true;
       } catch (error) {
         window.$message.error(`投送失败：${error instanceof Error ? error.message : "未知错误"}`);
@@ -170,14 +181,14 @@ export const useDlnaStore = defineStore("dlna", {
      */
     async castUrl(url: string, songId: number, cover?: string): Promise<boolean> {
       const musicStore = useMusicStore();
-      const statusStore = useStatusStore();
       if (!this.isCasting || !this.activeUuid) return false;
       if (!isCastableUrl(url)) return false;
       try {
         await dlnaPlay(this.activeUuid, url, cover, this.getCastMeta());
         this.castingSongId = songId ?? null;
         this.castingSongName = musicStore.playSong?.name ?? "";
-        statusStore.playStatus = true;
+        // 切歌投送成功：同样立即暂停本地，防止新歌在手机出声
+        this.pauseLocalAndSyncTv();
         return true;
       } catch (error) {
         window.$message.error(
@@ -310,6 +321,8 @@ export const useDlnaStore = defineStore("dlna", {
       if (this.changingSong) return;
       this.changingSong = true;
       try {
+        // 投送态下切歌：立即静音本地，避免新歌加载完成后在手机出声
+        useAudioManager().pause();
         // 切歌后引擎 src 需要重新加载，轮询等待新歌地址就绪
         const url = await this.waitForCastableUrl(10000);
         if (!url) {
