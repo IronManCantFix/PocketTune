@@ -47,6 +47,29 @@
 
 如需关注移动端待优化问题，可参考 `docs/mobile-ui-text-overlap-issues.md` 问题清单。
 
+### 🆕 DLNA 局域网投送（v4.4.x ~ v4.6.x 新增）
+
+在播放页点击投送按钮，即可把正在播放的歌曲投送到局域网内的 DLNA 设备（雷鸟 / TCL 等电视的「自带 DLNA」或乐播投屏均可）：
+
+- **电视全屏画面**：自动将「专辑封面 + 滚动歌词（KTV 风格：当前句白色大字 + 下一句灰色预览 + 翻译）+ 歌名/歌手」合成为视频流投送，电视不再黑屏
+- **手机端静音**：投送后手机自动静音，由电视独占出声；任意路径切歌（点播 / 上一首 / 下一首 / 随机 / FM）电视自动跟随
+- **自动连播**：电视播完一首自动切下一首，单曲循环模式自动重投当前歌
+- **完整控制**：播放 / 暂停 / 进度拖动 / 音量与静音（RenderingControl）均作用于电视
+- **断开续播**：断开投送后本地按电视当前进度继续播放
+- **刷新恢复**：投送会话持久化，刷新页面后自动探测电视恢复连接
+- **健壮性**：投送任务异步化（封面合成不阻塞请求）、失败自动重扫描重试、电视服务端口漂移自动跟踪、投送失败回滚原目标并恢复本地播放
+
+**使用前提**：
+
+1. 后端与电视处于同一局域网
+2. 建议容器使用 `network_mode: host`（DLNA 的 SSDP 组播发现依赖宿主网络，bridge 模式下无法发现设备）
+3. 建议配置 `DLNA_BASE_URL` 环境变量为 NAS 的内网地址（如 `http://192.168.x.x:25884`），使电视始终走局域网拉流，与访问入口（域名 / 内网 IP）解耦
+
+### 🆕 后端架构调整（v4.4.x ~ v4.6.x 新增）
+
+- **移除独立 UNM 进程**：不再在容器内启动 UnblockNeteaseMusic 服务与 `/etc/hosts` 域名劫持（其需独占 80/443 端口，与 host 网络模式冲突）。解灰由 Fastify 后端**内置的 UNM 库**在 `song_url` 响应处理中完成，配置项（`UNBLOCK_SOURCES`、`UNM_ENABLED` 等）保持不变
+- **DLNA 后端服务**：新增 `/api/dlna/*` 路由（设备发现 / 投送 / 控制 / 进度 / 音量），SSDP 发现与 SOAP 控制均在后端完成，前端仅做展示与指令转发
+
 ### 🆕 最近优化（v4.1.x）
 
 - **云盘功能增强**：
@@ -125,17 +148,39 @@ docker compose up -d
 
 > ⚠️ 注意：本仓库根目录自带的 `docker-compose.yml` 使用了 `build:` 字段与本地镜像标签 `image: splayer`，是**本地构建**用的配置，直接 `docker compose up` 会触发本地构建。仅拉取远程镜像部署时，请使用上方配置，或将 `image` 改为 `ghcr.io` 地址并移除 `build` 段。
 
+#### 启用 DLNA 投送（推荐配置）
+
+如需使用 DLNA 投送功能，建议使用以下配置（`network_mode: host` 为 SSDP 组播发现所必需）：
+
+```yaml
+services:
+  PocketTune:
+    image: ghcr.io/ironmancantfix/pockettune:latest
+    container_name: PocketTune
+    # DLNA 必需：共享宿主网络，SSDP 组播发现才能工作
+    network_mode: host
+    # host 模式下无需 ports 映射（容器内 nginx 直接监听宿主 25884）
+    restart: always
+    environment:
+      - UNBLOCK_SOURCES=kugou kuwo bilibili
+      # 投送拉流基址：电视始终从该地址拉取音频/视频流，与访问入口解耦
+      - DLNA_BASE_URL=http://192.168.5.100:25884
+```
+
 #### 环境变量说明
 
 | 变量                  | 默认值                | 说明                                                      |
 | --------------------- | --------------------- | --------------------------------------------------------- |
 | `NETEASE_SERVER_IP`   | `220.197.30.65`       | 网易云服务端 IP，可在宿主机通过 `ping music.163.com` 获得 |
 | `UNBLOCK_SOURCES`     | `kugou bodian pyncmd` | UnblockNeteaseMusic 使用的音源，多个以空格分隔            |
+| `UNM_ENABLED`         | `true`                | 是否启用后端内置解灰（song_url 响应自动替换失效链接）     |
 | `ENABLE_FLAC`         | `false`               | 是否解锁无损 (FLAC) 音质                                  |
 | `SELECT_MAX_BR`       | `true`                | 自动选择最高可用音质                                      |
 | `FOLLOW_SOURCE_ORDER` | `true`                | 按音源列表顺序依次尝试                                    |
 | `BLOCK_ADS`           | `true`                | 屏蔽网易云广告                                            |
 | `LOG_LEVEL`           | `info`                | 后端日志级别                                              |
+| `DLNA_BASE_URL`       | 无（用请求 Host 补全） | DLNA 投送的电视拉流基址，建议设为 NAS 内网地址           |
+| `UNM_PORT` / `UNM_SSL_PORT` | `80` / `443`    | 保留的独立 UNM 进程端口（仅在端口空闲时启动，一般无需配置） |
 
 > 全部变量均为可选项，支持透传 UnblockNeteaseMusic 的任何环境变量，完整列表见仓库 `docker-compose.yml` 内注释。
 
@@ -153,7 +198,8 @@ docker rm -f PocketTune
 
 - 在飞牛、1Panel、群晖等面板中「从镜像创建容器」时，默认容器名可能取镜像路径的第一段（例如 `ironmancantfix`），建议在创建表单中**手动指定容器名称**（如 `PocketTune`）；容器名不影响任何功能，仅用于标识，也可通过 `docker rename 旧名 PocketTune` 修改
 - 端口映射：容器内固定监听 `25884`，宿主机端口可按需映射（如 `8080:25884`）
-- 镜像支持 `linux/amd64` 与 `linux/arm64` 双架构，NAS 无论是 x86 还是 ARM 均可直接拉取使用
+- 镜像仅构建 `linux/amd64` 架构（目标部署环境为 x86 NAS）；ARM 设备暂不支持，可自行本地构建
+- DLNA 投送需 `network_mode: host` 与电视同一局域网，详见上方「启用 DLNA 投送」
 
 ### ⚠️ 说明
 
