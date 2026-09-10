@@ -137,6 +137,7 @@ const headersFor = (targetUrl: string): Record<string, string> => {
 
 /**
  * 下载封面图到临时文件
+ * 文件名带随机后缀，避免不同歌曲共用封面时的并发读写冲突
  * @returns 本地封面文件路径，失败返回 null
  */
 const downloadCover = async (coverUrl: string): Promise<string | null> => {
@@ -147,7 +148,11 @@ const downloadCover = async (coverUrl: string): Promise<string | null> => {
       maxContentLength: 20 * 1024 * 1024,
       headers: headersFor(coverUrl),
     });
-    const file = path.join(CACHE_DIR, `cover-${createHash("md5").update(coverUrl).digest("hex")}`);
+    const unique = createHash("md5")
+      .update(`${coverUrl}-${Date.now()}-${Math.random()}`)
+      .digest("hex")
+      .slice(0, 12);
+    const file = path.join(CACHE_DIR, `cover-${unique}`);
     await writeFile(file, Buffer.from(res.data));
     return file;
   } catch (error) {
@@ -247,16 +252,28 @@ const safeHost = (targetUrl: string): string => {
 };
 
 /**
- * 缓存清理：超过上限时按修改时间删除最旧的文件
+ * 缓存清理：
+ * 1. 超过上限时按修改时间删除最旧的视频文件
+ * 2. 清理滞留超 1 小时的残留字幕/封面文件（正常流程合成后即删，此处兜底）
  */
 const pruneCache = async (): Promise<void> => {
   const entries = await readdir(CACHE_DIR);
   const files: { file: string; mtime: number }[] = [];
+  const stale: string[] = [];
+  const staleLimit = Date.now() - 60 * 60 * 1000;
   for (const name of entries) {
-    if (!name.endsWith(".mp4")) continue;
     const file = path.join(CACHE_DIR, name);
     const info = await stat(file);
+    // 非视频的中间文件（.ass 字幕 / cover-* 封面）滞留超 1 小时视为残留
+    if (!name.endsWith(".mp4")) {
+      if (info.mtimeMs < staleLimit) stale.push(file);
+      continue;
+    }
     files.push({ file, mtime: info.mtimeMs });
+  }
+  // 兜底清理残留文件
+  for (const file of stale) {
+    await unlink(file).catch(() => undefined);
   }
   if (files.length <= MAX_CACHE_FILES) return;
   files.sort((a, b) => a.mtime - b.mtime);
@@ -304,13 +321,15 @@ export const ensureCoverMedia = async (
   if (existing) return existing;
 
   const task = (async (): Promise<string | null> => {
+    // 声明提到 try 外，供 finally 统一清理
+    let coverFile: string | null = null;
+    let assFile: string | null = null;
     try {
       // 无封面时无法合成视频
       if (!coverUrl) return null;
-      const coverFile = await downloadCover(coverUrl);
+      coverFile = await downloadCover(coverUrl);
       if (!coverFile) return null;
       // 有歌词时生成字幕文件烧录
-      let assFile: string | null = null;
       if (lyrics?.length) {
         assFile = path.join(CACHE_DIR, `${key}.ass`);
         await writeFile(assFile, generateLyricAss(lyrics, meta ?? {}), "utf8");
@@ -323,10 +342,9 @@ export const ensureCoverMedia = async (
         await unlink(outFile).catch(() => undefined);
         ok = await runFfmpeg(coverFile, audioUrl, outFile, null);
       }
-      // 失败清理半成品
+      // 合成失败清理半成品
       if (!ok) {
         await unlink(outFile).catch(() => undefined);
-        await unlink(assFile ?? "").catch(() => undefined);
         return null;
       }
       tokenIndex.set(key, outFile);
@@ -334,7 +352,10 @@ export const ensureCoverMedia = async (
       void pruneCache();
       return `/api/dlna/media?token=${key}`;
     } finally {
+      // 封面与字幕文件在合成结束后即无用处，无论成败立即清理
       inFlight.delete(key);
+      if (coverFile) await unlink(coverFile).catch(() => undefined);
+      if (assFile) await unlink(assFile).catch(() => undefined);
     }
   })();
 
