@@ -126,6 +126,14 @@ export class AudioElementPlayer extends BaseAudioPlayer {
   }
 
   /**
+   * 应用静音：直写元素 muted 属性
+   * 元素级静音先于音频图谱生效，后台直放（sourceNode 直连扬声器）路径同样被静音
+   */
+  protected applyMuted(): void {
+    this.audioElement.muted = this.muted;
+  }
+
+  /**
    * 加载音频资源
    * @param url 音频地址
    */

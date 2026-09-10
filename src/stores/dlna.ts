@@ -148,6 +148,8 @@ export const useDlnaStore = defineStore("dlna", {
     muteLocalForCast(): void {
       const audioManager = useAudioManager();
       audioManager.setVolume(0);
+      // 元素级静音：切后台直放会绕过增益节点，仅音量置 0 会漏音
+      audioManager.setMuted(true);
       // 本地未播放时以静音方式启动，保证进度跟随电视
       void audioManager.resume().catch(() => undefined);
       useStatusStore().playStatus = true;
@@ -253,6 +255,8 @@ export const useDlnaStore = defineStore("dlna", {
         const taskId = await dlnaPlay(uuid, url, this.getCurrentCover(), this.getCastMeta());
         // 任务提交成功即静音本地（封面合成耗时长，避免投送期间手机继续出声）
         useAudioManager().setVolume(0);
+        // 元素级静音：切后台直放会绕过增益节点，仅音量置 0 会漏音
+        useAudioManager().setMuted(true);
         // 显式传入本次投送目标，回滚前锁定，避免超时兜底停止到错误设备
         const ok = await this.awaitTaskResult(taskId, 120000, uuid);
         if (!ok) {
@@ -260,8 +264,9 @@ export const useDlnaStore = defineStore("dlna", {
           this.activeUuid = prevUuid;
           if (!prevCasting) {
             this.isCasting = false;
-            // 恢复引擎音量，避免无声假播放
+            // 恢复引擎音量与元素级静音，避免无声假播放或后台漏音
             useAudioManager().setVolume(useStatusStore().playVolume);
+            useAudioManager().setMuted(false);
             // play() 在 playStatus 为 true 时会早退，先复位再恢复播放
             if (wasLocalPlaying) {
               useStatusStore().playStatus = false;
@@ -288,8 +293,9 @@ export const useDlnaStore = defineStore("dlna", {
         this.activeUuid = prevUuid;
         if (!prevCasting) {
           this.isCasting = false;
-          // 恢复引擎音量，避免无声假播放
+          // 恢复引擎音量与元素级静音，避免无声假播放或后台漏音
           useAudioManager().setVolume(useStatusStore().playVolume);
+          useAudioManager().setMuted(false);
           // play() 在 playStatus 为 true 时会早退，先复位再恢复播放
           if (wasLocalPlaying) {
             useStatusStore().playStatus = false;
@@ -486,8 +492,9 @@ export const useDlnaStore = defineStore("dlna", {
       this.tvMuted = null;
       this.pollFailCount = 0;
       this.lastCastUrl = "";
-      // 恢复本地音量（投送期间本地引擎音量被置 0）
+      // 恢复本地音量与元素级静音（投送期间引擎音量置 0 且元素 muted）
       useAudioManager().setVolume(statusStore.playVolume);
+      useAudioManager().setMuted(false);
       statusStore.playStatus = false;
       // 恢复本地播放（投送前本地在播放时），并按电视进度续播
       if (resumeLocal && wasLocalPlaying) {
@@ -600,6 +607,8 @@ export const useDlnaStore = defineStore("dlna", {
       try {
         // 投送态下切歌：立即静音本地，避免新歌加载完成后在手机出声
         useAudioManager().setVolume(0);
+        // 元素级静音：切后台直放会绕过增益节点，仅音量置 0 会漏音
+        useAudioManager().setMuted(true);
         // 切歌后引擎 src 需要重新加载，轮询等待新歌地址就绪
         const url = await this.waitForCastableUrl(10000);
         if (!url) {
