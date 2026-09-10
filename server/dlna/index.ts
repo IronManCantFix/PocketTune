@@ -12,7 +12,7 @@ import {
   buildDidlMetadata,
 } from "./avtransport";
 import { discoverWithDebug, getDevice, refreshDevices, startDeviceWatcher } from "./deviceManager";
-import { ensureCoverMedia, getMediaFile } from "./media";
+import { ensureCoverMedia, getMediaFile, ensureTokenIndex } from "./media";
 import { createReadStream, existsSync, statSync } from "node:fs";
 import type { Readable } from "node:stream";
 
@@ -182,6 +182,8 @@ export const initDlnaAPI = async (fastify: FastifyInstance): Promise<void> => {
   fastify.get(
     "/dlna/media",
     async (req: FastifyRequest<{ Querystring: { token?: string } }>, reply: FastifyReply) => {
+      // 进程重启后首次拉流：先从磁盘恢复 token 索引
+      await ensureTokenIndex();
       const token = req.query.token ?? "";
       const file = getMediaFile(token);
       if (!file || !existsSync(file)) {

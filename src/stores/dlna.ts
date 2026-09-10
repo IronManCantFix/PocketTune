@@ -368,12 +368,10 @@ export const setupDlnaWatchers = (): void => {
     },
   );
 
-  // 本地播放拦截：投送态下引擎 play 事件立即压住（兜底所有播放路径）
+  // 本地播放拦截：投送态下引擎 play 事件立即压住（无差别拦截，含切歌加载完成的瞬间）
   const audioManager = useAudioManager();
   audioManager.addEventListener("play", () => {
     if (!store.isCasting) return;
-    // 投送中（正在换源）时先放行，由 castUrl 完成后统一静音
-    if (store.changingSong) return;
     audioManager.pause();
     useStatusStore().playStatus = true;
   });

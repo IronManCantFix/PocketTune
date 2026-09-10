@@ -35,6 +35,29 @@ const refererFor = (host: string): string =>
 // 缓存命中映射：token → 缓存文件路径
 const tokenIndex = new Map<string, string>();
 
+// tokenIndex 是否已从磁盘重建（进程重启后内存映射丢失，需从缓存目录恢复）
+let tokenIndexRestored = false;
+
+/**
+ * 从缓存目录重建 token 索引
+ * 进程重启/崩溃后内存映射丢失，但缓存文件还在——恢复索引避免电视拉流 404
+ */
+const restoreTokenIndex = async (): Promise<void> => {
+  if (tokenIndexRestored) return;
+  tokenIndexRestored = true;
+  try {
+    const entries = await readdir(CACHE_DIR);
+    for (const name of entries) {
+      if (!name.endsWith(".mp4")) continue;
+      const token = name.slice(0, -4);
+      tokenIndex.set(token, path.join(CACHE_DIR, name));
+    }
+    serverLog.info(`🔁 DLNA 媒体缓存索引已恢复（${tokenIndex.size} 个文件）`);
+  } catch {
+    // 目录不存在等场景忽略（首次运行）
+  }
+};
+
 // 进行中的合成任务去重（同 key 并发请求共用一次生成）
 const inFlight = new Map<string, Promise<string | null>>();
 
@@ -324,6 +347,8 @@ export const ensureCoverMedia = async (
   if (!cacheDirReady) {
     await mkdir(CACHE_DIR, { recursive: true });
     cacheDirReady = true;
+    // 进程重启后从磁盘恢复 token 索引
+    await restoreTokenIndex();
   }
   // 缓存 key 混入歌词内容摘要，歌词变化时自动重新合成
   const lyricDigest = lyrics?.length
@@ -388,3 +413,14 @@ export const ensureCoverMedia = async (
  * 按 token 获取缓存文件路径
  */
 export const getMediaFile = (token: string): string | null => tokenIndex.get(token) ?? null;
+
+/**
+ * media 端点拉流前的索引保障：必要时从磁盘恢复（进程重启后首次拉流场景）
+ */
+export const ensureTokenIndex = async (): Promise<void> => {
+  if (!cacheDirReady) {
+    await mkdir(CACHE_DIR, { recursive: true }).catch(() => undefined);
+    cacheDirReady = true;
+  }
+  await restoreTokenIndex();
+};
