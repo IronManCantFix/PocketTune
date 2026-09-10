@@ -148,12 +148,15 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
   return header + events.join("\n") + "\n";
 };
 
+// 缓存版本盐：影响视频输出的部署变更（字体/编码参数/字幕样式）时递增，使旧缓存全部失效
+const CACHE_VERSION = "2"; // v2 = 引入中文字体后的字幕版本
+
 /**
  * 计算媒体缓存 key 与 token
  */
 const mediaKey = (audioUrl: string, coverUrl?: string, lyricDigest = ""): string =>
   createHash("md5")
-    .update(`${audioUrl}|${coverUrl ?? ""}|${lyricDigest}`)
+    .update(`${CACHE_VERSION}|${audioUrl}|${coverUrl ?? ""}|${lyricDigest}`)
     .digest("hex");
 
 /**
