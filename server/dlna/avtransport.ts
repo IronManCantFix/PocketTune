@@ -3,10 +3,6 @@ import axios, { type AxiosResponse } from "axios";
 import { serverLog } from "../utils/logger";
 import type { DlnaDevice } from "./ssdp";
 
-// SOAP 命名空间
-const SOAP_ENV_NS = 'xmlns:s="http://schemas.xmlsoap.org/soap/envelope/"';
-const SOAP_ENC_NS = 'xmlns:u="urn:schemas-upnp-org:service:AVTransport:1"';
-
 /**
  * 渲染器当前播放状态
  */
@@ -56,7 +52,8 @@ const soapRequest = async (
 
   const envelope = [
     '<?xml version="1.0" encoding="utf-8"?>',
-    `<s:Envelope ${SOAP_ENV_NS} ${SOAP_ENC_NS}>`,
+    // encodingStyle 为 UPnP 规范要求：部分严格实现（如 Platinum SDK，雷鸟原生）缺失时拒绝所有请求
+    '<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">',
     "<s:Body>",
     `<u:${action} xmlns:u="urn:schemas-upnp-org:service:AVTransport:1">`,
     body,
@@ -141,6 +138,9 @@ export const dlnaSetUriAndPlay = async (
   url: string,
   meta = "",
 ): Promise<void> => {
+  // 先停止当前会话：标准 DLNA 客户端做法，避免上次会话状态机占用导致 SetURI 被拒
+  await soapRequest(device, "Stop", { InstanceID: "0" }).catch(() => undefined);
+  await sleep(200);
   await soapRequest(device, "SetAVTransportURI", {
     InstanceID: "0",
     CurrentURI: escapeSoapValue(url),
