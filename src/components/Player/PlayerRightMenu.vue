@@ -52,11 +52,15 @@
     <!-- 音量 -->
     <n-popover :show-arrow="false" :style="{ padding: 0 }">
       <template #trigger>
-        <div class="menu-icon hidden" @click.stop="player.toggleMute" @wheel="player.setVolume">
+        <div
+          class="menu-icon hidden"
+          @click.stop="handleVolumeIconClick"
+          @wheel="handleVolumeWheel"
+        >
           <SvgIcon :name="statusStore.playVolumeIcon" />
         </div>
       </template>
-      <div class="volume-change" @wheel="player.setVolume">
+      <div class="volume-change" @wheel="handleVolumeWheel">
         <n-slider
           v-model:value="statusStore.playVolume"
           :tooltip="false"
@@ -64,7 +68,7 @@
           :max="1"
           :step="0.01"
           vertical
-          @update:value="(val: number) => player.setVolume(val)"
+          @update:value="handleVolumeChange"
         />
         <n-text class="slider-num hidden">{{ statusStore.playVolumePercent }}%</n-text>
       </div>
@@ -88,17 +92,25 @@
 
 <script setup lang="ts">
 import { usePlayerController } from "@/core/player/PlayerController";
-import { useDataStore, useSettingStore, useStatusStore, useMusicStore } from "@/stores";
+import {
+  useDataStore,
+  useSettingStore,
+  useStatusStore,
+  useMusicStore,
+  useDlnaStore,
+} from "@/stores";
 import { renderIcon } from "@/utils/helper";
 import { openAutoClose, openChangeRate, openEqualizer, openABLoop } from "@/utils/modal";
 import { useAudioManager } from "@/core/player/AudioManager";
 import type { DropdownOption } from "naive-ui";
 import { useQualityControl } from "@/composables/useQualityControl";
+import { useThrottleFn } from "@vueuse/core";
 
 const dataStore = useDataStore();
 const statusStore = useStatusStore();
 const settingStore = useSettingStore();
 const musicStore = useMusicStore();
+const dlnaStore = useDlnaStore();
 const player = usePlayerController();
 
 const {
@@ -130,6 +142,35 @@ const handleClickOutside = (e: MouseEvent) => {
     return;
   }
   showQualityPopover.value = false;
+};
+
+// 音量操作：投送态转发电视，否则控制本地
+// 拖动滑块高频触发，节流避免投送态下频繁下发 SOAP 指令
+const handleVolumeChange = useThrottleFn((val: number) => {
+  if (dlnaStore.isCasting) {
+    void dlnaStore.setVolume(val);
+    return;
+  }
+  player.setVolume(val);
+}, 200);
+
+// 静音按钮：投送态转发电视
+const handleVolumeIconClick = () => {
+  if (dlnaStore.isCasting) {
+    void dlnaStore.toggleMute();
+    return;
+  }
+  player.toggleMute();
+};
+
+// 滚轮调音量：投送态转发电视
+const handleVolumeWheel = (e: WheelEvent) => {
+  if (dlnaStore.isCasting) {
+    const deltaY = e.deltaY;
+    void dlnaStore.setVolume(statusStore.playVolume + (deltaY > 0 ? -0.05 : 0.05));
+    return;
+  }
+  player.setVolume(e);
 };
 
 // 更多功能

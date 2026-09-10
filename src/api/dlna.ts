@@ -25,6 +25,20 @@ export interface DlnaTransportState {
   currentTime: number;
   /** 媒体总时长（秒） */
   duration: number;
+  /** 当前音量（0-100，设备不支持时为 null） */
+  volume: number | null;
+  /** 是否静音（设备不支持时为 null） */
+  muted: boolean | null;
+}
+
+/**
+ * 投送任务状态（后端异步合成+投送，前端轮询确认）
+ */
+export interface DlnaTaskState {
+  /** 任务状态：进行中 / 已完成 / 失败 */
+  state: "pending" | "done" | "error";
+  /** 失败原因或提示信息 */
+  message?: string;
 }
 
 /**
@@ -35,7 +49,8 @@ export const dlnaDiscover = async (): Promise<DlnaDeviceInfo[]> => {
     baseURL: "/api",
     url: "/dlna/discover",
     method: "post",
-    timeout: 10000,
+    // SSDP 收集 3.5s + 设备描述解析，留足余量避免慢设备超时
+    timeout: 15000,
   });
   return res?.data ?? [];
 };
@@ -55,40 +70,57 @@ export interface DlnaLyricLine {
 }
 
 /**
- * 投送媒体到目标设备并播放
+ * 投送媒体到目标设备并播放（后端异步执行，返回任务 id 供轮询确认）
  * @param uuid 设备 id
  * @param url 媒体地址（相对地址可由服务端补全为绝对地址）
  * @param cover 封面地址（可选，传入时服务端合成封面视频流，电视全屏显示）
  * @param options 附加元数据：歌词与歌名/歌手（封面视频模式烧录字幕用）
+ * @returns 投送任务 id（0 表示旧后端直接成功）
  */
 export const dlnaPlay = async (
   uuid: string,
   url: string,
   cover?: string,
   options?: { title?: string; artist?: string; lyrics?: DlnaLyricLine[] },
-): Promise<void> => {
+): Promise<number> => {
   const data: Record<string, unknown> = { uuid, url };
   if (cover) data.cover = cover;
   if (options?.title) data.title = options.title;
   if (options?.artist) data.artist = options.artist;
   if (options?.lyrics?.length) data.lyrics = options.lyrics;
-  await request<{ code: number; message?: string }>({
+  const res = await request<{ code: number; data?: { taskId: number }; message?: string }>({
     baseURL: "/api",
     url: "/dlna/play",
     method: "post",
     data,
   });
+  return res?.data?.taskId ?? 0;
+};
+
+/**
+ * 查询投送任务状态
+ * @param taskId 投送任务 id
+ * @returns 任务状态，任务不存在（已被清理）时返回 null
+ */
+export const dlnaTaskStatus = async (taskId: number): Promise<DlnaTaskState | null> => {
+  const res = await request<{ code: number; data?: DlnaTaskState | null }>({
+    baseURL: "/api",
+    url: "/dlna/task",
+    method: "get",
+    params: { id: taskId },
+  });
+  return res?.data ?? null;
 };
 
 /**
  * 控制渲染器播放
  * @param uuid 设备 id
- * @param action 指令：pause / resume / stop / seek
- * @param value seek 目标时间（秒）
+ * @param action 指令：pause / resume / stop / seek / volume / mute
+ * @param value seek 目标时间（秒）、volume 音量（0-100）、mute 静音标记（0/1）
  */
 export const dlnaControl = async (
   uuid: string,
-  action: "pause" | "resume" | "stop" | "seek",
+  action: "pause" | "resume" | "stop" | "seek" | "volume" | "mute",
   value?: number,
 ): Promise<void> => {
   await request<{ code: number; message?: string }>({
@@ -100,7 +132,7 @@ export const dlnaControl = async (
 };
 
 /**
- * 查询渲染器播放状态与进度
+ * 查询渲染器播放状态与进度（含音量/静音）
  */
 export const dlnaStatus = async (uuid: string): Promise<DlnaTransportState | null> => {
   const res = await request<{ code: number; data: DlnaTransportState }>({

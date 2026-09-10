@@ -23,8 +23,10 @@ export interface DlnaDevice {
   location: string;
   /** 设备类型（通常为 MediaRenderer） */
   deviceType: string;
-  /** 渲染器控制地址 */
+  /** 渲染器控制地址（AVTransport 服务） */
   controlUrl: string;
+  /** 音量控制地址（RenderingControl 服务，可能为空） */
+  rcControlUrl: string;
   /** 事件订阅地址 */
   eventSubUrl: string;
 }
@@ -93,20 +95,25 @@ const matchDeviceBlocks = (xml: string): string[] => {
 };
 
 /**
- * 遍历所有 service 节点，定位 AVTransport 服务的控制地址
+ * 遍历所有 service 节点，定位 AVTransport 与 RenderingControl 服务的控制地址
+ * RenderingControl 负责音量/静音（部分设备缺失时置空，音量功能自动降级）
  */
-const findAvtransportService = (deviceXml: string): { controlPath: string; eventPath: string } => {
+const findControlServices = (
+  deviceXml: string,
+): { controlPath: string; rcControlPath: string; eventPath: string } => {
+  const result = { controlPath: "", rcControlPath: "", eventPath: "" };
   const regex = /<[a-zA-Z0-9]*:?service>([\s\S]*?)<\/[a-zA-Z0-9]*:?service>/g;
   let match: RegExpExecArray | null;
   while ((match = regex.exec(deviceXml)) !== null) {
-    if (extractTag(match[1], "serviceType").includes("AVTransport")) {
-      return {
-        controlPath: extractTag(match[1], "controlURL"),
-        eventPath: extractTag(match[1], "eventSubURL"),
-      };
+    const serviceType = extractTag(match[1], "serviceType");
+    if (serviceType.includes("AVTransport") && !result.controlPath) {
+      result.controlPath = extractTag(match[1], "controlURL");
+      result.eventPath = extractTag(match[1], "eventSubURL") || result.eventPath;
+    } else if (serviceType.includes("RenderingControl") && !result.rcControlPath) {
+      result.rcControlPath = extractTag(match[1], "controlURL");
     }
   }
-  return { controlPath: "", eventPath: "" };
+  return result;
 };
 
 /**
@@ -133,8 +140,8 @@ const parseDeviceDescription = async (location: string): Promise<DlnaDevice | nu
     const uuid = extractTag(deviceXml, "UDN").replace(/^uuid:/, "");
     const name = extractTag(deviceXml, "friendlyName");
 
-    // 定位 AVTransport 服务（负责媒体播放控制）
-    const { controlPath, eventPath } = findAvtransportService(deviceXml);
+    // 定位 AVTransport 与 RenderingControl 服务（负责媒体播放与音量控制）
+    const { controlPath, rcControlPath, eventPath } = findControlServices(deviceXml);
     if (!controlPath) return null;
 
     return {
@@ -143,6 +150,7 @@ const parseDeviceDescription = async (location: string): Promise<DlnaDevice | nu
       location,
       deviceType,
       controlUrl: resolveUrl(location, controlPath),
+      rcControlUrl: rcControlPath ? resolveUrl(location, rcControlPath) : "",
       eventSubUrl: resolveUrl(location, eventPath),
     };
   } catch (error) {

@@ -39,16 +39,13 @@
 </template>
 
 <script setup lang="ts">
-import { usePlayerController } from "@/core/player/PlayerController";
-import { useStatusStore, useDlnaStore, setupDlnaWatchers } from "@/stores";
+import { useDlnaStore, setupDlnaWatchers } from "@/stores";
 import { openCastModal } from "@/utils/modal";
 
 // 紧凑模式：窄区域（底部播放条）下投送态仅显示高亮图标，防止状态条撑开布局
 withDefaults(defineProps<{ compact?: boolean }>(), { compact: false });
 
 const dlnaStore = useDlnaStore();
-const player = usePlayerController();
-const statusStore = useStatusStore();
 
 // 打开投送弹窗
 const handleOpenCast = () => {
@@ -60,20 +57,20 @@ const handleTogglePlay = () => {
   void dlnaStore.togglePlay();
 };
 
-// 断开投送并恢复本地播放
+// 断开投送：停止电视，并按投送前状态恢复本地播放（由 store 统一处理）
 const handleDisconnect = async () => {
   await dlnaStore.disconnect();
-  // 恢复本地播放（若投送前本地在播放，从暂停点继续）
-  if (statusStore.playStatus) {
-    void player.play();
-  }
 };
 
 // 投送成功后本地静音由 store（castTo/castUrl）统一处理，此处不再重复补偿
 
-// 挂载时激活投送全局联动（模块级单例：切歌联动 + 本地静音拦截）
+// 挂载时激活投送全局联动（模块级单例：切歌联动 + 本地静音拦截 + 刷新恢复投送态）
 onMounted(() => {
   setupDlnaWatchers();
+  // 刷新后恢复投送态：直接启动轮询（watch 对已恢复的初始值不触发）
+  if (dlnaStore.isCasting) {
+    startPolling();
+  }
 });
 
 // 投送态下周期性轮询电视播放状态/进度
@@ -211,6 +208,17 @@ onUnmounted(stopPolling);
 
   .cast-name {
     max-width: 56px;
+  }
+}
+
+// 窄窗口下（PC 展开播放器）投送状态条降级为紧凑图标，防止右侧功能区溢出挤压进度条
+@media (max-width: 1200px) {
+  .cast-bar:not(.cast-mobile) {
+    padding: 6px 6px 6px 8px;
+
+    .cast-name {
+      display: none;
+    }
   }
 }
 </style>

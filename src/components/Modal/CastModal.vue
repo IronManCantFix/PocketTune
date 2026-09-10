@@ -40,6 +40,7 @@
         >
           已连接
         </n-button>
+        <n-spin v-else-if="dlnaStore.castingPending && castingUuid === device.uuid" size="small" />
       </div>
       <n-text depth="3" style="font-size: 12px">
         提示：局域网内投送，手机与电视需连接同一 Wi-Fi。
@@ -53,6 +54,9 @@ import { useDlnaStore } from "@/stores";
 
 const dlnaStore = useDlnaStore();
 
+// 正在投送的设备（显示加载态）
+const castingUuid = ref("");
+
 // 打开弹窗时自动扫描一次
 onMounted(async () => {
   if (dlnaStore.devices.length === 0 && !dlnaStore.discovering) {
@@ -65,9 +69,12 @@ const handleRefresh = async () => {
   await dlnaStore.discover();
 };
 
-// 投送到指定设备
+// 投送到指定设备（投送中防连点，避免重复提交任务）
 const handleCast = async (uuid: string) => {
+  if (dlnaStore.castingPending || castingUuid.value) return;
+  castingUuid.value = uuid;
   const success = await dlnaStore.castTo(uuid);
+  castingUuid.value = "";
   if (success) {
     window.$message.success(
       `已投送到 ${dlnaStore.devices.find((d) => d.uuid === uuid)?.name ?? "设备"}`,

@@ -15,6 +15,10 @@ export interface DlnaTransportState {
   currentTime: number;
   /** 媒体总时长（秒） */
   duration: number;
+  /** 当前音量（0-100，RenderingControl 查询失败时为 null） */
+  volume: number | null;
+  /** 是否静音（RenderingControl 查询失败时为 null） */
+  muted: boolean | null;
 }
 
 // SOAP 响应中的常见命名空间前缀（s: / u:）
@@ -34,18 +38,34 @@ const parseUpnpTime = (value: string): number => {
   return parts[0] * 3600 + parts[1] * 60 + parts[2];
 };
 
+// DLNA 控制服务类型：AVTransport（播放控制）/ RenderingControl（音量控制）
+type DlnaService = "AVTransport" | "RenderingControl";
+
+// 服务类型对应的 URN（SOAPAction 与 Body 命名空间）
+const SOAP_SERVICE_URN: Record<DlnaService, string> = {
+  AVTransport: "urn:schemas-upnp-org:service:AVTransport:1",
+  RenderingControl: "urn:schemas-upnp-org:service:RenderingControl:1",
+};
+
 /**
- * 发送 SOAP 指令到渲染器 AVTransport 服务
+ * 发送 SOAP 指令到渲染器指定服务
  * @param device 目标设备
  * @param action SOAP 动作名
  * @param args 动作参数（{ 参数名: 值 }）
+ * @param service 控制服务类型（默认 AVTransport）
  * @returns 响应 XML 文本
  */
 const soapRequest = async (
   device: DlnaDevice,
   action: string,
   args: Record<string, string>,
+  service: DlnaService = "AVTransport",
 ): Promise<string> => {
+  const controlUrl = service === "RenderingControl" ? device.rcControlUrl : device.controlUrl;
+  if (!controlUrl) {
+    throw new Error(`设备缺少 ${service} 控制地址`);
+  }
+  const serviceUrn = SOAP_SERVICE_URN[service];
   const body = Object.entries(args)
     .map(([key, value]) => `<${key}>${value}</${key}>`)
     .join("");
@@ -55,7 +75,7 @@ const soapRequest = async (
     // encodingStyle 为 UPnP 规范要求：部分严格实现（如 Platinum SDK，雷鸟原生）缺失时拒绝所有请求
     '<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">',
     "<s:Body>",
-    `<u:${action} xmlns:u="urn:schemas-upnp-org:service:AVTransport:1">`,
+    `<u:${action} xmlns:u="${serviceUrn}">`,
     body,
     `</u:${action}>`,
     "</s:Body>",
@@ -64,11 +84,11 @@ const soapRequest = async (
 
   let res: AxiosResponse<string>;
   try {
-    res = await axios.post<string>(device.controlUrl, envelope, {
+    res = await axios.post<string>(controlUrl, envelope, {
       timeout: 8000,
       headers: {
         "Content-Type": 'text/xml; charset="utf-8"',
-        SOAPAction: `"urn:schemas-upnp-org:service:AVTransport:1#${action}"`,
+        SOAPAction: `"${serviceUrn}#${action}"`,
         "User-Agent": "PocketTune-DLNA/1.0",
       },
     });
@@ -77,7 +97,7 @@ const soapRequest = async (
     if (axios.isAxiosError(error)) {
       const body = String(error.response?.data ?? "").slice(0, 300);
       serverLog.error(
-        `❌ SOAP ${action} HTTP 错误: ${error.response?.status ?? "无响应"} 设备: ${device.name} 控制地址: ${device.controlUrl} 响应体: ${body}`,
+        `❌ SOAP ${action} HTTP 错误: ${error.response?.status ?? "无响应"} 设备: ${device.name} 控制地址: ${controlUrl} 响应体: ${body}`,
       );
       const err = new Error(
         `SOAP ${action} HTTP ${error.response?.status ?? "无响应"}: ${body || error.message}`,
@@ -189,7 +209,72 @@ export const dlnaSeek = async (device: DlnaDevice, seconds: number): Promise<voi
 };
 
 /**
- * 查询渲染器播放状态与进度
+ * 设置渲染器音量（RenderingControl 服务）
+ * @param device 目标设备
+ * @param volume 音量（0-100 整数）
+ */
+export const dlnaSetVolume = async (device: DlnaDevice, volume: number): Promise<void> => {
+  const value = Math.max(0, Math.min(100, Math.round(volume)));
+  await soapRequest(
+    device,
+    "SetVolume",
+    { InstanceID: "0", Channel: "Master", DesiredVolume: String(value) },
+    "RenderingControl",
+  );
+};
+
+/**
+ * 设置渲染器静音（RenderingControl 服务）
+ * @param device 目标设备
+ * @param muted 是否静音
+ */
+export const dlnaSetMute = async (device: DlnaDevice, muted: boolean): Promise<void> => {
+  await soapRequest(
+    device,
+    "SetMute",
+    { InstanceID: "0", Channel: "Master", DesiredMute: muted ? "1" : "0" },
+    "RenderingControl",
+  );
+};
+
+/**
+ * 查询渲染器当前音量（失败返回 null，不阻断主流程）
+ */
+const dlnaGetVolume = async (device: DlnaDevice): Promise<number | null> => {
+  try {
+    const xml = await soapRequest(
+      device,
+      "GetVolume",
+      { InstanceID: "0", Channel: "Master" },
+      "RenderingControl",
+    );
+    const raw = extractSoapValue(xml, "CurrentVolume");
+    const volume = Number(raw);
+    return Number.isFinite(volume) ? volume : null;
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * 查询渲染器静音状态（失败返回 null，不阻断主流程）
+ */
+const dlnaGetMute = async (device: DlnaDevice): Promise<boolean | null> => {
+  try {
+    const xml = await soapRequest(
+      device,
+      "GetMute",
+      { InstanceID: "0", Channel: "Master" },
+      "RenderingControl",
+    );
+    return extractSoapValue(xml, "CurrentMute") === "1";
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * 查询渲染器播放状态与进度（附带音量/静音，失败时置 null）
  */
 export const dlnaGetStatus = async (device: DlnaDevice): Promise<DlnaTransportState> => {
   const [transportXml, positionXml] = await Promise.all([
@@ -201,10 +286,15 @@ export const dlnaGetStatus = async (device: DlnaDevice): Promise<DlnaTransportSt
   const position = extractSoapValue(positionXml, "RelTime");
   const trackDuration = extractSoapValue(positionXml, "TrackDuration");
 
+  // 音量/静音独立查询：设备无 RenderingControl 时返回 null，前端自动忽略
+  const [volume, muted] = await Promise.all([dlnaGetVolume(device), dlnaGetMute(device)]);
+
   return {
     playing: state === "PLAYING",
     state,
     currentTime: parseUpnpTime(position),
     duration: parseUpnpTime(trackDuration),
+    volume,
+    muted,
   };
 };

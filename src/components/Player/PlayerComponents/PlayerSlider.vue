@@ -61,6 +61,8 @@ const throttledSeek = useThrottleFn((value: number) => {
 // 开始拖拽
 const startDrag = () => {
   isDragging.value = true;
+  // 通知投送轮询跳过进度回写，避免拖动中滑块被回跳
+  dlnaStore.sliderDragging = true;
   // 立即赋值当前时间
   dragValue.value = statusStore.currentTime;
 };
@@ -68,6 +70,7 @@ const startDrag = () => {
 // 结束拖拽
 const endDrag = () => {
   isDragging.value = false;
+  dlnaStore.sliderDragging = false;
   // 直接更改进度
   setSeek(dragValue.value);
 };
