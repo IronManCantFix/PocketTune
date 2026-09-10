@@ -763,6 +763,8 @@ class LyricManager {
    */
   public async prefetchLyric(song: SongType) {
     if (!song) return;
+    // 已预取同一首时跳过（预取可能被多处触发：播放器预载与投送预合成）
+    if (this.prefetchedLyric?.id === song.id) return;
     try {
       console.log(`Lyrics prefetching started: [${song.id}] ${song.name}`);
       const result = await this.fetchLyric(song);
@@ -775,6 +777,41 @@ class LyricManager {
     } catch (e) {
       console.warn(`Lyrics prefetch failed: [${song.id}]`, e);
     }
+  }
+
+  /**
+   * 获取预取歌词的行级数据（与播放管线同源处理，投送预合成用）
+   * 仅读取预取缓存，不写入当前播放歌词状态；未预取时等待预取完成
+   * @param song 目标歌曲
+   * @returns 行级歌词（lrcData 形态），无歌词返回空数组之外的 null
+   */
+  public async getPrewarmLyricLines(song: SongType): Promise<LyricLine[] | null> {
+    if (!song) return null;
+    // 未预取或预取的不是目标歌曲时等待预取完成
+    if (this.prefetchedLyric?.id !== song.id) {
+      await this.prefetchLyric(song);
+    }
+    if (this.prefetchedLyric?.id !== song.id) return null;
+    // 与 setFinalLyric 同源处理，保证预合成字幕与真实投送一致（缓存 key 含歌词摘要）
+    let lyricData = applyBracketReplacement(this.prefetchedLyric.result.data);
+    lyricData = applyProfanityUncensor(lyricData, useSettingStore().uncensorMaskedProfanity);
+    this.normalizeLyricLines(lyricData.yrcData);
+    this.normalizeLyricLines(lyricData.lrcData);
+    // 只有逐字歌词时构成普通歌词（与播放管线一致）
+    if (lyricData.lrcData.length === 0 && lyricData.yrcData.length > 0) {
+      lyricData.lrcData = lyricData.yrcData.map((line) => ({
+        ...line,
+        words: [
+          {
+            word: line.words?.map((w) => w.word)?.join("") || "",
+            startTime: line.startTime || 0,
+            endTime: line.endTime || 0,
+            romanWord: line.words?.map((w) => w.romanWord)?.join("") || undefined,
+          },
+        ],
+      }));
+    }
+    return lyricData.lrcData ?? null;
   }
 }
 

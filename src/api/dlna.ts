@@ -146,6 +146,32 @@ export const dlnaTaskCancel = async (taskId: number): Promise<void> => {
 };
 
 /**
+ * 预合成下一首的封面视频（只填缓存不投送，真正切歌时缓存命中秒切）
+ * @param options 与投送一致的元数据：url/cover/标题/歌手/songId/歌词
+ */
+export const dlnaPrewarm = async (options: {
+  url: string;
+  cover?: string;
+  title?: string;
+  artist?: string;
+  songId?: number;
+  lyrics?: DlnaLyricLine[];
+}): Promise<void> => {
+  const data: Record<string, unknown> = { url: options.url };
+  if (options.cover) data.cover = options.cover;
+  if (options.title) data.title = options.title;
+  if (options.artist) data.artist = options.artist;
+  if (options.songId != null) data.songId = options.songId;
+  if (options.lyrics?.length) data.lyrics = options.lyrics;
+  await request<{ code: number }>({
+    baseURL: "/api",
+    url: "/dlna/prewarm",
+    method: "post",
+    data,
+  });
+};
+
+/**
  * 控制渲染器播放
  * @param uuid 设备 id
  * @param action 指令：pause / resume / stop / seek / volume / mute

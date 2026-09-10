@@ -4,6 +4,7 @@ import { defineStore } from "pinia";
 import {
   dlnaDiscover,
   dlnaPlay,
+  dlnaPrewarm,
   dlnaProbe,
   dlnaTaskStatus,
   dlnaTaskCancel,
@@ -15,7 +16,11 @@ import {
 } from "@/api/dlna";
 import { useAudioManager } from "@/core/player/AudioManager";
 import { usePlayerController } from "@/core/player/PlayerController";
-import { useMusicStore, useStatusStore } from "@/stores";
+import { useSongManager } from "@/core/player/SongManager";
+import { useLyricManager } from "@/core/player/LyricManager";
+import { useMusicStore, useStatusStore, useDataStore } from "@/stores";
+import type { SongType } from "@/types/main";
+import type { LyricLine } from "@applemusic-like-lyrics/lyric";
 
 // 通用延时
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
@@ -58,6 +63,8 @@ interface DlnaState {
   pollFailCount: number;
   /** 最近一次成功投送的媒体地址（投送态单曲循环播完重投用） */
   lastCastUrl: string;
+  /** 最近一次预合成的歌曲 id（预合成去重，仅运行期） */
+  lastPrewarmedSongId: number | null;
 }
 
 /**
@@ -70,6 +77,21 @@ const isCastableUrl = (url: string): boolean => {
   // 相对同源代理地址（如 /api/unblock/proxy?url=...）
   if (url.startsWith("/")) return true;
   return false;
+};
+
+/**
+ * 歌词行转投送字幕负载（真实投送与预合成共用，保证缓存 key 的歌词摘要一致）
+ */
+const toDlnaLyrics = (lines: LyricLine[] | null | undefined): DlnaLyricLine[] | undefined => {
+  const payload = (lines ?? [])
+    .filter((line) => line.words?.length)
+    .map((line) => ({
+      startTime: line.startTime,
+      endTime: line.endTime,
+      words: line.words.map((w) => w.word).join(""),
+      translatedLyric: line.translatedLyric || undefined,
+    }));
+  return payload.length > 0 ? payload : undefined;
 };
 
 export const useDlnaStore = defineStore("dlna", {
@@ -91,6 +113,7 @@ export const useDlnaStore = defineStore("dlna", {
     lastVolumeChangeAt: 0,
     pollFailCount: 0,
     lastCastUrl: "",
+    lastPrewarmedSongId: null,
   }),
   getters: {
     /** 当前投送目标设备 */
@@ -287,6 +310,8 @@ export const useDlnaStore = defineStore("dlna", {
         this.muteLocalForCast();
         // 电视可能已播放一段（中途加入），一次性对齐本地进度
         await this.alignLocalToTv();
+        // 后台预合成下一首，切歌时电视秒切
+        void this.prewarmNextSong();
         return true;
       } catch (error) {
         window.$message.error(`投送失败：${error instanceof Error ? error.message : "未知错误"}`);
@@ -327,20 +352,10 @@ export const useDlnaStore = defineStore("dlna", {
       const artistName = Array.isArray(song?.artists)
         ? song.artists.map((a) => a.name).join(" / ")
         : (song?.artists as string) || "";
-      // 歌词行精简转换（仅保留字幕所需字段）
-      const lines = musicStore.songLyric?.lrcData ?? [];
-      const lyrics: DlnaLyricLine[] = lines
-        .filter((line) => line.words?.length)
-        .map((line) => ({
-          startTime: line.startTime,
-          endTime: line.endTime,
-          words: line.words.map((w) => w.word).join(""),
-          translatedLyric: line.translatedLyric || undefined,
-        }));
       return {
         title: song?.name,
         artist: artistName,
-        lyrics: lyrics.length > 0 ? lyrics : undefined,
+        lyrics: toDlnaLyrics(musicStore.songLyric?.lrcData),
         songId: song?.id,
       };
     },
@@ -370,12 +385,62 @@ export const useDlnaStore = defineStore("dlna", {
         this.muteLocalForCast();
         // 切歌合成耗时导致两端起点不同，一次性对齐本地进度
         await this.alignLocalToTv();
+        // 后台预合成下一首，下次切歌电视秒切
+        void this.prewarmNextSong();
         return true;
       } catch {
         // 失败提示由调用方负责，此处静默返回 false
         return false;
       } finally {
         this.castingPending = false;
+      }
+    },
+
+    /**
+     * 预合成播放列表下一首的封面视频（只填缓存不投送）
+     * 真正切歌时 ensureCoverMedia 缓存命中，电视秒切；失败静默退化为常规合成
+     */
+    async prewarmNextSong(): Promise<void> {
+      if (!this.isCasting || !this.activeUuid) return;
+      // 单曲循环不会播下一首，无需预合成
+      if (useStatusStore().repeatMode === "one") return;
+      const statusStore = useStatusStore();
+      const musicStore = useMusicStore();
+      // 计算下一首（与 SongManager.prefetchNextSong 取曲逻辑一致）
+      let nextSong: SongType | undefined;
+      if (statusStore.personalFmMode) {
+        nextSong = musicStore.personalFM.list[musicStore.personalFM.playIndex + 1];
+      } else {
+        const playList = useDataStore().playList;
+        if (!playList?.length) return;
+        let nextIndex = statusStore.playIndex + 1;
+        if (nextIndex >= playList.length) nextIndex = 0;
+        nextSong = playList[nextIndex];
+      }
+      if (!nextSong?.id || nextSong.path) return;
+      // 同一首不重复预合成
+      if (nextSong.id === this.lastPrewarmedSongId) return;
+      try {
+        const songManager = useSongManager();
+        const lyricManager = useLyricManager();
+        // 复用播放器预取：解析下一首地址并预取封面/歌词（播放时也会消费该预取）
+        const source = await songManager.prefetchNextSong();
+        if (!source?.url || source.id !== nextSong.id || !isCastableUrl(source.url)) return;
+        // 歌词与播放管线同源处理，保证预合成缓存 key 与真实投送一致
+        const lines = await lyricManager.getPrewarmLyricLines(nextSong);
+        this.lastPrewarmedSongId = nextSong.id;
+        await dlnaPrewarm({
+          url: source.url,
+          cover: nextSong.coverSize?.l || nextSong.cover || undefined,
+          title: nextSong.name,
+          artist: Array.isArray(nextSong.artists)
+            ? nextSong.artists.map((a) => a.name).join(" / ")
+            : (nextSong.artists as string) || undefined,
+          songId: nextSong.id,
+          lyrics: toDlnaLyrics(lines),
+        });
+      } catch {
+        // 预合成失败静默：真正切歌时退化为常规合成
       }
     },
 

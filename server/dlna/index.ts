@@ -308,6 +308,52 @@ export const initDlnaAPI = async (fastify: FastifyInstance): Promise<void> => {
     },
   );
 
+  // 预合成下一首的封面视频（只填缓存不投送）：真正切歌时缓存命中，电视秒切
+  fastify.post(
+    "/dlna/prewarm",
+    async (
+      req: FastifyRequest<{
+        Body: {
+          url?: string;
+          cover?: string;
+          title?: string;
+          artist?: string;
+          songId?: number;
+          lyrics?: {
+            startTime: number;
+            endTime: number;
+            words: string;
+            translatedLyric?: string;
+          }[];
+        };
+      }>,
+      reply: FastifyReply,
+    ) => {
+      const { url, cover, title, artist, songId, lyrics } = req.body ?? {};
+      if (!url) {
+        return reply.code(400).send({ code: 400, message: "缺少 url 参数" });
+      }
+      const targetUrl = normalizeUrl(req, url);
+      if (!targetUrl) {
+        return reply.code(400).send({ code: 400, message: "不支持的投送地址" });
+      }
+      const coverAbsolute = cover ? (normalizeUrl(req, cover) ?? cover) : undefined;
+      // 后台执行不阻塞响应；与真实投送共用 ensureCoverMedia（同 key 命中缓存，inFlight 去重）
+      void ensureCoverMedia(targetUrl, coverAbsolute, lyrics, { title, artist }, songId != null ? String(songId) : undefined)
+        .then((result) =>
+          serverLog.info(
+            result
+              ? `🔥 预合成完成: songId=${songId ?? "?"}`
+              : `⚠️ 预合成未产出（切歌时将常规合成）: songId=${songId ?? "?"}`,
+          ),
+        )
+        .catch((error) =>
+          serverLog.warn("⚠️ 预合成异常（已忽略）:", error instanceof Error ? error.message : error),
+        );
+      return reply.send({ code: 200, message: "预合成已提交" });
+    },
+  );
+
   // 查询投送任务状态（投送结果异步确认用）
   fastify.get(
     "/dlna/task",
