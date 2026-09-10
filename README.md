@@ -169,18 +169,18 @@ services:
 
 #### 环境变量说明
 
-| 变量                  | 默认值                | 说明                                                      |
-| --------------------- | --------------------- | --------------------------------------------------------- |
-| `NETEASE_SERVER_IP`   | `220.197.30.65`       | 网易云服务端 IP，可在宿主机通过 `ping music.163.com` 获得 |
-| `UNBLOCK_SOURCES`     | `kugou bodian pyncmd` | UnblockNeteaseMusic 使用的音源，多个以空格分隔            |
-| `UNM_ENABLED`         | `true`                | 是否启用后端内置解灰（song_url 响应自动替换失效链接）     |
-| `ENABLE_FLAC`         | `false`               | 是否解锁无损 (FLAC) 音质                                  |
-| `SELECT_MAX_BR`       | `true`                | 自动选择最高可用音质                                      |
-| `FOLLOW_SOURCE_ORDER` | `true`                | 按音源列表顺序依次尝试                                    |
-| `BLOCK_ADS`           | `true`                | 屏蔽网易云广告                                            |
-| `LOG_LEVEL`           | `info`                | 后端日志级别                                              |
-| `DLNA_BASE_URL`       | 无（用请求 Host 补全） | DLNA 投送的电视拉流基址，建议设为 NAS 内网地址           |
-| `UNM_PORT` / `UNM_SSL_PORT` | `80` / `443`    | 保留的独立 UNM 进程端口（仅在端口空闲时启动，一般无需配置） |
+| 变量                        | 默认值                 | 说明                                                        |
+| --------------------------- | ---------------------- | ----------------------------------------------------------- |
+| `NETEASE_SERVER_IP`         | `220.197.30.65`        | 网易云服务端 IP，可在宿主机通过 `ping music.163.com` 获得   |
+| `UNBLOCK_SOURCES`           | `kugou bodian pyncmd`  | UnblockNeteaseMusic 使用的音源，多个以空格分隔              |
+| `UNM_ENABLED`               | `true`                 | 是否启用后端内置解灰（song_url 响应自动替换失效链接）       |
+| `ENABLE_FLAC`               | `false`                | 是否解锁无损 (FLAC) 音质                                    |
+| `SELECT_MAX_BR`             | `true`                 | 自动选择最高可用音质                                        |
+| `FOLLOW_SOURCE_ORDER`       | `true`                 | 按音源列表顺序依次尝试                                      |
+| `BLOCK_ADS`                 | `true`                 | 屏蔽网易云广告                                              |
+| `LOG_LEVEL`                 | `info`                 | 后端日志级别                                                |
+| `DLNA_BASE_URL`             | 无（用请求 Host 补全） | DLNA 投送的电视拉流基址，建议设为 NAS 内网地址              |
+| `UNM_PORT` / `UNM_SSL_PORT` | `80` / `443`           | 保留的独立 UNM 进程端口（仅在端口空闲时启动，一般无需配置） |
 
 > 全部变量均为可选项，支持透传 UnblockNeteaseMusic 的任何环境变量，完整列表见仓库 `docker-compose.yml` 内注释。
 

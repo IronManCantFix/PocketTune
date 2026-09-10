@@ -71,6 +71,8 @@ const handleRefresh = async () => {
 
 // 投送到指定设备（投送中防连点，避免重复提交任务）
 const handleCast = async (uuid: string) => {
+  // 已连接设备不重复投送
+  if (dlnaStore.activeDevice?.uuid === uuid) return;
   if (dlnaStore.castingPending || castingUuid.value) return;
   castingUuid.value = uuid;
   const success = await dlnaStore.castTo(uuid);

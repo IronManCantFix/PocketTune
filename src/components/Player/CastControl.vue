@@ -5,15 +5,23 @@
   </div>
 
   <!-- 紧凑模式：投送态只显示高亮图标，避免窄区域（底部播放条）被状态条撑开 -->
-  <div v-else-if="compact" class="cast-btn cast-active" @click.stop="handleOpenCast">
+  <div
+    v-else-if="compact"
+    class="cast-btn cast-active"
+    :class="{ pending: dlnaStore.castingPending }"
+    @click.stop="handleOpenCast"
+  >
     <SvgIcon name="RssFeed" />
   </div>
 
   <!-- 已投送：投送状态条 -->
   <div v-else class="cast-bar" @click.stop>
     <SvgIcon name="RssFeed" :size="16" class="cast-active-icon" />
-    <span class="cast-name" :title="dlnaStore.activeDevice?.name ?? '电视'">
-      {{ dlnaStore.activeDevice?.name ?? "电视" }}
+    <span
+      class="cast-name"
+      :title="dlnaStore.castingPending ? '投送中…' : (dlnaStore.activeDevice?.name ?? '电视')"
+    >
+      {{ dlnaStore.castingPending ? "投送中…" : (dlnaStore.activeDevice?.name ?? "电视") }}
     </span>
     <div class="cast-actions">
       <n-button
@@ -64,43 +72,10 @@ const handleDisconnect = async () => {
 
 // 投送成功后本地静音由 store（castTo/castUrl）统一处理，此处不再重复补偿
 
-// 挂载时激活投送全局联动（模块级单例：切歌联动 + 本地静音拦截 + 刷新恢复投送态）
+// 挂载时激活投送全局联动（模块级单例：切歌联动 + 本地静音拦截 + 刷新恢复投送态 + 轮询启停）
 onMounted(() => {
   setupDlnaWatchers();
-  // 刷新后恢复投送态：直接启动轮询（watch 对已恢复的初始值不触发）
-  if (dlnaStore.isCasting) {
-    startPolling();
-  }
 });
-
-// 投送态下周期性轮询电视播放状态/进度
-let pollTimer: number | null = null;
-const startPolling = () => {
-  stopPolling();
-  pollTimer = window.setInterval(() => {
-    void dlnaStore.syncPosition();
-  }, 1500);
-};
-const stopPolling = () => {
-  if (pollTimer !== null) {
-    window.clearInterval(pollTimer);
-    pollTimer = null;
-  }
-};
-
-// 投送态开启时启动轮询，关闭时停止
-watch(
-  () => dlnaStore.isCasting,
-  (casting) => {
-    if (casting) {
-      startPolling();
-    } else {
-      stopPolling();
-    }
-  },
-);
-
-onUnmounted(stopPolling);
 </script>
 
 <style scoped lang="scss">
@@ -142,6 +117,21 @@ onUnmounted(stopPolling);
     height: 6px;
     border-radius: 50%;
     background-color: var(--primary-hex);
+  }
+}
+
+// 投送任务进行中：状态点闪烁提示（不改变布局尺寸）
+.cast-btn.cast-active.pending::after {
+  animation: cast-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes cast-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.3;
   }
 }
 

@@ -53,6 +53,7 @@ const SOAP_SERVICE_URN: Record<DlnaService, string> = {
  * @param action SOAP 动作名
  * @param args 动作参数（{ 参数名: 值 }）
  * @param service 控制服务类型（默认 AVTransport）
+ * @param timeoutMs 请求超时毫秒（默认 8000）
  * @returns 响应 XML 文本
  */
 const soapRequest = async (
@@ -60,6 +61,7 @@ const soapRequest = async (
   action: string,
   args: Record<string, string>,
   service: DlnaService = "AVTransport",
+  timeoutMs = 8000,
 ): Promise<string> => {
   const controlUrl = service === "RenderingControl" ? device.rcControlUrl : device.controlUrl;
   if (!controlUrl) {
@@ -85,7 +87,7 @@ const soapRequest = async (
   let res: AxiosResponse<string>;
   try {
     res = await axios.post<string>(controlUrl, envelope, {
-      timeout: 8000,
+      timeout: timeoutMs,
       headers: {
         "Content-Type": 'text/xml; charset="utf-8"',
         SOAPAction: `"${serviceUrn}#${action}"`,
@@ -135,15 +137,22 @@ const escapeXml = (value: string): string =>
  * @param title 标题
  * @param mime MIME 类型
  */
-export const buildDidlMetadata = (url: string, title: string, mime: string): string =>
-  `<DIDL-Lite xmlns="urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/" ` +
-  `xmlns:dc="http://purl.org/dc/elements/1.1/" ` +
-  `xmlns:upnp="urn:schemas-upnp-org:metadata-1-0/upnp/">` +
-  `<item id="0" restricted="1">` +
-  `<dc:title>${escapeXml(title)}</dc:title>` +
-  `<upnp:class>object.item.audioItem.musicTrack</upnp:class>` +
-  `<res protocolInfo="http-get:*:${mime}:*">${escapeXml(url)}</res>` +
-  `</item></DIDL-Lite>`;
+export const buildDidlMetadata = (url: string, title: string, mime: string): string => {
+  // 视频投送声明 videoItem，避免严格渲染器按音频处理
+  const upnpClass = mime.startsWith("video/")
+    ? "object.item.videoItem.movie"
+    : "object.item.audioItem.musicTrack";
+  return (
+    `<DIDL-Lite xmlns="urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/" ` +
+    `xmlns:dc="http://purl.org/dc/elements/1.1/" ` +
+    `xmlns:upnp="urn:schemas-upnp-org:metadata-1-0/upnp/">` +
+    `<item id="0" restricted="1">` +
+    `<dc:title>${escapeXml(title)}</dc:title>` +
+    `<upnp:class>${upnpClass}</upnp:class>` +
+    `<res protocolInfo="http-get:*:${mime}:*">${escapeXml(url)}</res>` +
+    `</item></DIDL-Lite>`
+  );
+};
 
 /**
  * 设置渲染器播放地址并播放
@@ -240,13 +249,14 @@ export const dlnaSetMute = async (device: DlnaDevice, muted: boolean): Promise<v
 /**
  * 查询渲染器当前音量（失败返回 null，不阻断主流程）
  */
-const dlnaGetVolume = async (device: DlnaDevice): Promise<number | null> => {
+const dlnaGetVolume = async (device: DlnaDevice, timeoutMs = 8000): Promise<number | null> => {
   try {
     const xml = await soapRequest(
       device,
       "GetVolume",
       { InstanceID: "0", Channel: "Master" },
       "RenderingControl",
+      timeoutMs,
     );
     const raw = extractSoapValue(xml, "CurrentVolume");
     const volume = Number(raw);
@@ -259,13 +269,14 @@ const dlnaGetVolume = async (device: DlnaDevice): Promise<number | null> => {
 /**
  * 查询渲染器静音状态（失败返回 null，不阻断主流程）
  */
-const dlnaGetMute = async (device: DlnaDevice): Promise<boolean | null> => {
+const dlnaGetMute = async (device: DlnaDevice, timeoutMs = 8000): Promise<boolean | null> => {
   try {
     const xml = await soapRequest(
       device,
       "GetMute",
       { InstanceID: "0", Channel: "Master" },
       "RenderingControl",
+      timeoutMs,
     );
     return extractSoapValue(xml, "CurrentMute") === "1";
   } catch {
@@ -277,9 +288,10 @@ const dlnaGetMute = async (device: DlnaDevice): Promise<boolean | null> => {
  * 查询渲染器播放状态与进度（附带音量/静音，失败时置 null）
  */
 export const dlnaGetStatus = async (device: DlnaDevice): Promise<DlnaTransportState> => {
+  // 状态查询统一用短超时：电视离线时轮询失败更快暴露
   const [transportXml, positionXml] = await Promise.all([
-    soapRequest(device, "GetTransportInfo", { InstanceID: "0" }),
-    soapRequest(device, "GetPositionInfo", { InstanceID: "0" }),
+    soapRequest(device, "GetTransportInfo", { InstanceID: "0" }, "AVTransport", 5000),
+    soapRequest(device, "GetPositionInfo", { InstanceID: "0" }, "AVTransport", 5000),
   ]);
 
   const state = extractSoapValue(transportXml, "CurrentTransportState");
@@ -287,7 +299,10 @@ export const dlnaGetStatus = async (device: DlnaDevice): Promise<DlnaTransportSt
   const trackDuration = extractSoapValue(positionXml, "TrackDuration");
 
   // 音量/静音独立查询：设备无 RenderingControl 时返回 null，前端自动忽略
-  const [volume, muted] = await Promise.all([dlnaGetVolume(device), dlnaGetMute(device)]);
+  const [volume, muted] = await Promise.all([
+    dlnaGetVolume(device, 5000),
+    dlnaGetMute(device, 5000),
+  ]);
 
   return {
     playing: state === "PLAYING",

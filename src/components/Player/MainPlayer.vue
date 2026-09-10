@@ -65,7 +65,7 @@
               type="primary"
               size="small"
               round
-              @click="openChangeRate"
+              @click="openLocalOnly(openChangeRate)"
             >
               {{ statusStore.playRate }}x
             </n-tag>
@@ -291,6 +291,12 @@ const handlePlayOrPause = () => {
     return;
   }
   void player.playOrPause();
+};
+
+// 投送态下打开本地专属功能前提示（功能本身仍作用于本地播放）
+const openLocalOnly = (fn: () => void) => {
+  if (dlnaStore.isCasting) window.$message.info("投送播放中，该功能仅在本地播放生效");
+  fn();
 };
 
 const { timeDisplay, toggleTimeFormat } = useTimeFormat();
