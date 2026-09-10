@@ -45,9 +45,9 @@ COPY --from=builder /runtime /app
 
 # 安装 Node 运行时、ffmpeg 与简体中文字体（DLNA 封面视频流的字幕烧录必需）
 # 字体用 Noto Sans CJK SC 单语言 OTF（16MB），替代 110MB 的全量 CJK 包
+# 下载用 Node 内置 fetch（精简基础镜像无 ca-certificates，busybox wget 无法走 HTTPS）
 RUN apk add --no-cache nodejs ffmpeg fontconfig \
-    && wget -qO /usr/share/fonts/NotoSansCJKsc-Regular.otf \
-      "https://github.com/googlefonts/noto-cjk/raw/main/Sans/OTF/SimplifiedChinese/NotoSansCJKsc-Regular.otf" \
+    && node -e "const fs=require('fs');const sources=['https://github.com/googlefonts/noto-cjk/raw/main/Sans/OTF/SimplifiedChinese/NotoSansCJKsc-Regular.otf','https://cdn.jsdelivr.net/gh/notofonts/noto-cjk@main/Sans/OTF/SimplifiedChinese/NotoSansCJKsc-Regular.otf','https://raw.githubusercontent.com/notofonts/noto-cjk/main/Sans/OTF/SimplifiedChinese/NotoSansCJKsc-Regular.otf'];(async()=>{for(const url of sources){try{const res=await fetch(url);if(!res.ok)throw new Error('HTTP '+res.status);const buf=Buffer.from(await res.arrayBuffer());if(buf.length<10485760)throw new Error('文件过小: '+buf.length);fs.writeFileSync('/usr/share/fonts/NotoSansCJKsc-Regular.otf',buf);console.log('字体下载成功 ('+Math.round(buf.length/1048576)+'MB): '+url);process.exit(0);}catch(e){console.warn('源失败: '+url+' -> '+e.message);}}console.error('所有字体源均失败');process.exit(1);})();" \
     && fc-cache -f \
     && sed -i 's/\r$//' /docker-entrypoint.sh \
     && chmod +x /docker-entrypoint.sh
