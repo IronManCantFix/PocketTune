@@ -86,6 +86,10 @@ const isMainEntry = (() => {
 })();
 
 if (isMainEntry) {
+  // 后台异步任务的未捕获异常只记录不退出（如缓存清理竞态），保证服务持续可用
+  process.on("unhandledRejection", (reason) => {
+    serverLog.error("⚠️ 未处理的 Promise 拒绝（服务继续运行）:", reason);
+  });
   initAppServer().catch((error) => {
     serverLog.error("🚫 AppServer 启动失败", error);
     process.exit(1);

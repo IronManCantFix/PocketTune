@@ -268,34 +268,42 @@ const safeHost = (targetUrl: string): string => {
  * 缓存清理：
  * 1. 超过上限时按修改时间删除最旧的视频文件
  * 2. 清理滞留超 1 小时的残留字幕/封面文件（正常流程合成后即删，此处兜底）
+ * 全程容忍文件消失（与合成任务的即时清理并发时文件可能已被删除）
  */
 const pruneCache = async (): Promise<void> => {
-  const entries = await readdir(CACHE_DIR);
-  const files: { file: string; mtime: number }[] = [];
-  const stale: string[] = [];
-  const staleLimit = Date.now() - 60 * 60 * 1000;
-  for (const name of entries) {
-    const file = path.join(CACHE_DIR, name);
-    const info = await stat(file);
-    // 非视频的中间文件（.ass 字幕 / cover-* 封面）滞留超 1 小时视为残留
-    if (!name.endsWith(".mp4")) {
-      if (info.mtimeMs < staleLimit) stale.push(file);
-      continue;
+  try {
+    const entries = await readdir(CACHE_DIR);
+    const files: { file: string; mtime: number }[] = [];
+    const stale: string[] = [];
+    const staleLimit = Date.now() - 60 * 60 * 1000;
+    for (const name of entries) {
+      const file = path.join(CACHE_DIR, name);
+      // 文件可能已被合成任务的 finally 删除（并发竞态），跳过即可
+      const info = await stat(file).catch(() => null);
+      if (!info) continue;
+      // 非视频的中间文件（.ass 字幕 / cover-* 封面）滞留超 1 小时视为残留
+      if (!name.endsWith(".mp4")) {
+        if (info.mtimeMs < staleLimit) stale.push(file);
+        continue;
+      }
+      files.push({ file, mtime: info.mtimeMs });
     }
-    files.push({ file, mtime: info.mtimeMs });
-  }
-  // 兜底清理残留文件
-  for (const file of stale) {
-    await unlink(file).catch(() => undefined);
-  }
-  if (files.length <= MAX_CACHE_FILES) return;
-  files.sort((a, b) => a.mtime - b.mtime);
-  for (const item of files.slice(0, files.length - MAX_CACHE_FILES)) {
-    await unlink(item.file).catch(() => undefined);
-    // 同步清理 token 索引
-    for (const [token, file] of tokenIndex.entries()) {
-      if (file === item.file) tokenIndex.delete(token);
+    // 兜底清理残留文件
+    for (const file of stale) {
+      await unlink(file).catch(() => undefined);
     }
+    if (files.length <= MAX_CACHE_FILES) return;
+    files.sort((a, b) => a.mtime - b.mtime);
+    for (const item of files.slice(0, files.length - MAX_CACHE_FILES)) {
+      await unlink(item.file).catch(() => undefined);
+      // 同步清理 token 索引
+      for (const [token, file] of tokenIndex.entries()) {
+        if (file === item.file) tokenIndex.delete(token);
+      }
+    }
+  } catch (error) {
+    // 清理失败仅记录日志，绝不影响主流程
+    serverLog.warn("⚠️ 缓存清理异常（已忽略）:", error instanceof Error ? error.message : error);
   }
 };
 
