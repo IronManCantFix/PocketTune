@@ -43,8 +43,12 @@ COPY --from=builder /app/docker-entrypoint.sh /docker-entrypoint.sh
 # 部署自包含的 server 运行时（源码 + 生产依赖）
 COPY --from=builder /runtime /app
 
-# 安装 Node 运行时、ffmpeg 与中文字体（DLNA 封面视频流的字幕烧录必需字体）
-RUN apk add --no-cache nodejs ffmpeg font-noto-cjk \
+# 安装 Node 运行时、ffmpeg 与简体中文字体（DLNA 封面视频流的字幕烧录必需）
+# 字体用 Noto Sans CJK SC 单语言 OTF（16MB），替代 110MB 的全量 CJK 包
+RUN apk add --no-cache nodejs ffmpeg fontconfig \
+    && wget -qO /usr/share/fonts/NotoSansCJKsc-Regular.otf \
+      "https://github.com/googlefonts/noto-cjk/raw/main/Sans/OTF/SimplifiedChinese/NotoSansCJKsc-Regular.otf" \
+    && fc-cache -f \
     && sed -i 's/\r$//' /docker-entrypoint.sh \
     && chmod +x /docker-entrypoint.sh
 
