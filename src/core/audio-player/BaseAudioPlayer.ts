@@ -79,6 +79,8 @@ export abstract class BaseAudioPlayer
   protected isInitialized = false;
   /** 目标音量 (0-1) */
   protected volume: number = 1;
+  /** 元素级静音标志（后台直放等绕过增益的路径也必须生效） */
+  protected muted: boolean = false;
   /** ReplayGain 增益 (1.0 = 0dB) */
   protected replayGain: number = 1.0;
   /** 存储淡出暂停的定时器 ID */
@@ -339,6 +341,21 @@ export abstract class BaseAudioPlayer
   public getVolume(): number {
     return this.volume;
   }
+
+  /**
+   * 设置元素级静音
+   * @param muted 是否静音
+   */
+  public setMuted(muted: boolean): void {
+    this.muted = muted;
+    this.applyMuted();
+  }
+
+  /**
+   * 应用静音到具体输出路径
+   * 基类默认无操作，子类按自身输出拓扑实现（如元素 muted 属性）
+   */
+  protected applyMuted(): void {}
 
   /**
    * 应用音量渐变

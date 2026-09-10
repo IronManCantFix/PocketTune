@@ -117,6 +117,14 @@ export interface IPlaybackEngine {
    */
   setVolume(value: number): void;
 
+  /**
+   * 设置元素级静音
+   * 投送静音依赖此能力：后台直放会绕过 WebAudio 增益节点，
+   * 仅元素 muted 属性能在任意输出路径下可靠静音
+   * @param muted 是否静音
+   */
+  setMuted?(muted: boolean): void;
+
   rampVolumeTo?(value: number, duration: number, curve?: FadeCurve): void;
 
   /**

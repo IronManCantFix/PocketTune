@@ -33,6 +33,8 @@ class AudioManager extends TypedEventTarget<AudioEventMap> implements IPlaybackE
 
   /** 主音量 (用于 Crossfade 初始化) */
   private _masterVolume: number = 1.0;
+  /** 元素级静音标志（跨引擎保持，投送静音用） */
+  private _muted: boolean = false;
 
   /** 当前引擎类型：element | ffmpeg */
   public readonly engineType: "element" | "ffmpeg";
@@ -159,6 +161,8 @@ class AudioManager extends TypedEventTarget<AudioEventMap> implements IPlaybackE
     this.pendingEngine = newEngine;
     // 预设状态
     newEngine.setVolume(0);
+    // 继承管理器级静音（投送静音跨引擎保持）
+    newEngine.setMuted?.(this._muted);
     if (this.engine.capabilities.supportsRate) {
       // 优先使用传入的速率
       const targetRate = options.rate ?? this.getRate();
@@ -337,6 +341,17 @@ class AudioManager extends TypedEventTarget<AudioEventMap> implements IPlaybackE
   public setVolume(value: number): void {
     this._masterVolume = value;
     this.engine.setVolume(value);
+  }
+
+  /**
+   * 设置元素级静音
+   * 状态保存在管理器上，换引擎（混音交叉淡入等）时由新引擎继承，
+   * 避免投送静音因后台直放绕过增益节点而失效
+   * @param muted 是否静音
+   */
+  public setMuted(muted: boolean): void {
+    this._muted = muted;
+    this.engine.setMuted?.(muted);
   }
 
   /**

@@ -2,6 +2,8 @@
   <div class="full-player-mobile" ref="mobileStart">
     <!-- 顶部功能栏 -->
     <div class="top-bar">
+      <!-- DLNA 投送 -->
+      <CastControl class="cast-mobile" />
       <!-- 收起按钮 -->
       <div class="btn" @click.stop="statusStore.showFullPlayer = false">
         <SvgIcon name="Down" :size="26" />
@@ -97,7 +99,7 @@
               strong
               secondary
               circle
-              @click.stop="player.playOrPause()"
+              @click.stop="handlePlayOrPause"
             >
               <template #icon>
                 <Transition name="fade" mode="out-in">
@@ -179,7 +181,13 @@
 
 <script setup lang="ts">
 import { useSwipe } from "@vueuse/core";
-import { useMusicStore, useStatusStore, useDataStore, useSettingStore } from "@/stores";
+import {
+  useMusicStore,
+  useStatusStore,
+  useDataStore,
+  useSettingStore,
+  useDlnaStore,
+} from "@/stores";
 import { usePlayerController } from "@/core/player/PlayerController";
 import { useTimeFormat } from "@/composables/useTimeFormat";
 import { toLikeSong, isLogin } from "@/utils/auth";
@@ -190,8 +198,18 @@ const musicStore = useMusicStore();
 const statusStore = useStatusStore();
 const settingStore = useSettingStore();
 const dataStore = useDataStore();
+const dlnaStore = useDlnaStore();
 const player = usePlayerController();
 const { timeDisplay, toggleTimeFormat } = useTimeFormat();
+
+// 播放/暂停：投送态下作用于电视，否则作用于本地
+const handlePlayOrPause = () => {
+  if (dlnaStore.isCasting) {
+    void dlnaStore.togglePlay();
+    return;
+  }
+  void player.playOrPause();
+};
 
 // 是否可以上传至云盘（在线普通歌曲且已登录）
 const canUploadToCloud = computed(

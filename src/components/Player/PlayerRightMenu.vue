@@ -52,21 +52,24 @@
     <!-- 音量 -->
     <n-popover :show-arrow="false" :style="{ padding: 0 }">
       <template #trigger>
-        <div class="menu-icon hidden" @click.stop="player.toggleMute" @wheel="player.setVolume">
-          <SvgIcon :name="statusStore.playVolumeIcon" />
+        <div
+          class="menu-icon hidden"
+          @click.stop="handleVolumeIconClick"
+          @wheel="handleVolumeWheel"
+        >
+          <SvgIcon :name="volumeIcon" />
         </div>
       </template>
-      <div class="volume-change" @wheel="player.setVolume">
+      <div class="volume-change" @wheel="handleVolumeWheel">
         <n-slider
-          v-model:value="statusStore.playVolume"
+          v-model:value="volumeModel"
           :tooltip="false"
           :min="0"
           :max="1"
           :step="0.01"
           vertical
-          @update:value="(val: number) => player.setVolume(val)"
         />
-        <n-text class="slider-num hidden">{{ statusStore.playVolumePercent }}%</n-text>
+        <n-text class="slider-num hidden">{{ Math.round(volumeModel * 100) }}%</n-text>
       </div>
     </n-popover>
     <!-- 播放列表 -->
@@ -88,7 +91,13 @@
 
 <script setup lang="ts">
 import { usePlayerController } from "@/core/player/PlayerController";
-import { useDataStore, useSettingStore, useStatusStore, useMusicStore } from "@/stores";
+import {
+  useDataStore,
+  useSettingStore,
+  useStatusStore,
+  useMusicStore,
+  useDlnaStore,
+} from "@/stores";
 import { renderIcon } from "@/utils/helper";
 import { openAutoClose, openChangeRate, openEqualizer, openABLoop } from "@/utils/modal";
 import { useAudioManager } from "@/core/player/AudioManager";
@@ -99,6 +108,7 @@ const dataStore = useDataStore();
 const statusStore = useStatusStore();
 const settingStore = useSettingStore();
 const musicStore = useMusicStore();
+const dlnaStore = useDlnaStore();
 const player = usePlayerController();
 
 const {
@@ -132,6 +142,58 @@ const handleClickOutside = (e: MouseEvent) => {
   showQualityPopover.value = false;
 };
 
+// 投送态音量节流下发（200ms，trailing 保证拖动结束的最终音量必下发），避免高频发送 SOAP 控制请求
+const throttledCastVolume = useThrottleFn(
+  (val: number) => void dlnaStore.setVolume(val),
+  200,
+  true,
+);
+
+// 音量模型：投送态绑定电视音量镜像（tvVolume/tvMuted），否则绑定本地音量（playVolume）
+// 两个音量体系彻底分离：电视音量绝不写入用户本地音量设置
+const volumeModel = computed<number>({
+  get: () => {
+    if (dlnaStore.isCasting) {
+      return (dlnaStore.tvMuted ? 0 : (dlnaStore.tvVolume ?? 0)) / 100;
+    }
+    return statusStore.playVolume;
+  },
+  set: (val: number) => {
+    if (dlnaStore.isCasting) {
+      throttledCastVolume(val);
+      return;
+    }
+    player.setVolume(val);
+  },
+});
+
+// 音量图标：投送态依据电视音量/静音镜像，否则本地音量
+const volumeIcon = computed<string>(() => {
+  if (dlnaStore.isCasting) {
+    const vol = dlnaStore.tvVolume ?? 0;
+    if (dlnaStore.tvMuted || vol === 0) return "VolumeOff";
+    if (vol < 40) return "VolumeDown";
+    return "VolumeUp";
+  }
+  return statusStore.playVolumeIcon;
+});
+
+// 静音按钮：投送态转发电视
+const handleVolumeIconClick = () => {
+  if (dlnaStore.isCasting) {
+    void dlnaStore.toggleMute();
+    return;
+  }
+  player.toggleMute();
+};
+
+// 滚轮调音量：基于当前音量模型增减（投送态转发电视，否则控制本地）
+const handleVolumeWheel = (e: WheelEvent) => {
+  const base = volumeModel.value;
+  const next = Math.max(0, Math.min(1, base + (e.deltaY > 0 ? -0.05 : 0.05)));
+  volumeModel.value = next;
+};
+
 // 更多功能
 const audioManager = useAudioManager();
 
@@ -160,6 +222,12 @@ const controlsOptions = computed<DropdownOption[]>(() => [
   },
 ]);
 
+// 投送态下打开本地专属功能前提示（功能本身仍作用于本地播放）
+const openLocalOnly = (fn: () => void) => {
+  if (dlnaStore.isCasting) window.$message.info("投送播放中，该功能仅在本地播放生效");
+  fn();
+};
+
 // 更多功能选择
 const handleControls = (key: string) => {
   switch (key) {
@@ -168,16 +236,16 @@ const handleControls = (key: string) => {
         window.$message.warning("当前引擎不支持均衡器功能");
         return;
       }
-      openEqualizer();
+      openLocalOnly(openEqualizer);
       break;
     case "autoClose":
       openAutoClose();
       break;
     case "abLoop":
-      openABLoop();
+      openLocalOnly(openABLoop);
       break;
     case "rate":
-      openChangeRate();
+      openLocalOnly(openChangeRate);
       break;
   }
 };

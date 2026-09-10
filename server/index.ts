@@ -1,6 +1,7 @@
 import { initNcmAPI } from "./netease";
 import { initUnblockAPI } from "./unblock";
 import { initQQMusicAPI } from "./qqmusic";
+import { initDlnaAPI } from "./dlna";
 import fastifyCookie from "@fastify/cookie";
 import fastifyMultipart from "@fastify/multipart";
 import fastify from "fastify";
@@ -45,6 +46,10 @@ const initAppServer = async () => {
             name: "QQMusicAPI",
             url: "/api/qqmusic",
           },
+          {
+            name: "DlnaAPI",
+            url: "/api/dlna",
+          },
         ],
       });
     });
@@ -52,6 +57,7 @@ const initAppServer = async () => {
     server.register(initNcmAPI, { prefix: "/api" });
     server.register(initUnblockAPI, { prefix: "/api" });
     server.register(initQQMusicAPI, { prefix: "/api" });
+    server.register(initDlnaAPI, { prefix: "/api" });
     // 启动端口
     const port = Number(process.env.PORT || 3000);
     await server.listen({ port, host: "0.0.0.0" });
@@ -80,6 +86,10 @@ const isMainEntry = (() => {
 })();
 
 if (isMainEntry) {
+  // 后台异步任务的未捕获异常只记录不退出（如缓存清理竞态），保证服务持续可用
+  process.on("unhandledRejection", (reason) => {
+    serverLog.error("⚠️ 未处理的 Promise 拒绝（服务继续运行）:", reason);
+  });
   initAppServer().catch((error) => {
     serverLog.error("🚫 AppServer 启动失败", error);
     process.exit(1);

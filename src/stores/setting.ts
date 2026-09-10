@@ -467,6 +467,8 @@ export interface SettingState {
   disableDjMode: boolean;
   /** 启用自动混音 */
   enableAutomix: boolean;
+  /** DLNA 投送时合成封面视频（含歌词字幕）；关闭则纯音频直投（切歌秒切） */
+  dlnaCastVideo: boolean;
   /** 自动混音最大分析时间 (秒) */
   automixMaxAnalyzeTime: number;
   /** 启用全局错误弹窗 */
@@ -740,6 +742,7 @@ export const useSettingStore = defineStore("setting", {
     disableAiAudio: false,
     disableDjMode: false,
     enableAutomix: false,
+    dlnaCastVideo: true,
     automixMaxAnalyzeTime: 60,
     enableGlobalErrorDialog: true,
     macos: {

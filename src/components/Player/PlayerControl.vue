@@ -102,7 +102,7 @@
               strong
               secondary
               circle
-              @click.stop="player.playOrPause()"
+              @click.stop="handlePlayOrPause"
             >
               <template #icon>
                 <Transition name="fade" mode="out-in">
@@ -148,6 +148,7 @@
         </div>
         <n-flex class="right" align="center" justify="end">
           <!-- 功能区 -->
+          <CastControl />
           <PlayerRightMenu />
         </n-flex>
       </div>
@@ -158,7 +159,13 @@
 <script setup lang="ts">
 import { usePlayerController } from "@/core/player/PlayerController";
 import { useSongManager } from "@/core/player/SongManager";
-import { useDataStore, useMusicStore, useStatusStore, useSettingStore } from "@/stores";
+import {
+  useDataStore,
+  useMusicStore,
+  useStatusStore,
+  useSettingStore,
+  useDlnaStore,
+} from "@/stores";
 import { toLikeSong, isLogin } from "@/utils/auth";
 import { useTimeFormat } from "@/composables/useTimeFormat";
 import { openDownloadSong, openPlaylistAdd, openCloudUpload } from "@/utils/modal";
@@ -169,6 +176,7 @@ const dataStore = useDataStore();
 const musicStore = useMusicStore();
 const statusStore = useStatusStore();
 const settingStore = useSettingStore();
+const dlnaStore = useDlnaStore();
 
 const songManager = useSongManager();
 const player = usePlayerController();
@@ -183,6 +191,15 @@ const canUploadToCloud = computed(
     musicStore.playSong.type === "song" &&
     isLogin() === 1,
 );
+
+// 播放/暂停：投送态下作用于电视，否则作用于本地
+const handlePlayOrPause = () => {
+  if (dlnaStore.isCasting) {
+    void dlnaStore.togglePlay();
+    return;
+  }
+  void player.playOrPause();
+};
 
 // 获取评论数量
 const fetchCommentCount = async () => {

@@ -15,7 +15,7 @@
 </template>
 
 <script setup lang="ts">
-import { useMusicStore, useSettingStore, useStatusStore } from "@/stores";
+import { useMusicStore, useSettingStore, useStatusStore, useDlnaStore } from "@/stores";
 import { msToTime } from "@/utils/time";
 import { usePlayerController } from "@/core/player/PlayerController";
 import { LyricLine } from "@applemusic-like-lyrics/lyric";
@@ -26,6 +26,7 @@ withDefaults(defineProps<{ showTooltip?: boolean }>(), { showTooltip: true });
 const musicStore = useMusicStore();
 const statusStore = useStatusStore();
 const settingStore = useSettingStore();
+const dlnaStore = useDlnaStore();
 
 const player = usePlayerController();
 
@@ -60,6 +61,8 @@ const throttledSeek = useThrottleFn((value: number) => {
 // 开始拖拽
 const startDrag = () => {
   isDragging.value = true;
+  // 通知投送轮询跳过进度回写，避免拖动中滑块被回跳
+  dlnaStore.sliderDragging = true;
   // 立即赋值当前时间
   dragValue.value = statusStore.currentTime;
 };
@@ -67,6 +70,7 @@ const startDrag = () => {
 // 结束拖拽
 const endDrag = () => {
   isDragging.value = false;
+  dlnaStore.sliderDragging = false;
   // 直接更改进度
   setSeek(dragValue.value);
 };
@@ -109,6 +113,11 @@ const getCurrentLyric = (value: number) => {
 
 // 调节进度
 const setSeek = (value: number) => {
+  // 投送态下进度调节作用于电视
+  if (dlnaStore.isCasting) {
+    void dlnaStore.seek(value / 1000);
+    return;
+  }
   // 歌词吸附
   if (settingStore.progressAdjustLyric) {
     const lyric = toRaw(musicStore.songLyric.lrcData);

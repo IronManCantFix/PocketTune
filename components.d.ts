@@ -20,6 +20,8 @@ declare module 'vue' {
     BackgroundRender: typeof import('./src/components/AMLL/BackgroundRender.vue')['default']
     BatchList: typeof import('./src/components/Modal/BatchList.vue')['default']
     CacheSizeLimit: typeof import('./src/components/Setting/components/CacheSizeLimit.vue')['default']
+    CastControl: typeof import('./src/components/Player/CastControl.vue')['default']
+    CastModal: typeof import('./src/components/Modal/CastModal.vue')['default']
     ChangeRate: typeof import('./src/components/Modal/ChangeRate.vue')['default']
     CloudMatch: typeof import('./src/components/Modal/CloudMatch.vue')['default']
     CloudUploadFileModal: typeof import('./src/components/Modal/CloudUploadFileModal.vue')['default']
