@@ -381,8 +381,7 @@ export const useDlnaStore = defineStore("dlna", {
     async setVolume(volume01: number): Promise<void> {
       if (!this.isCasting || !this.activeUuid) return;
       const vol01 = Math.max(0, Math.min(volume01, 1));
-      useStatusStore().playVolume = vol01;
-      this.tvVolume = Math.round(vol01 * 100);
+      // 仅更新电视音量镜像，绝不触碰用户本地音量设置（playVolume 已持久化）
       this.lastVolumeChangeAt = Date.now();
       try {
         await dlnaControl(this.activeUuid, "volume", Math.round(vol01 * 100));
@@ -396,18 +395,11 @@ export const useDlnaStore = defineStore("dlna", {
      */
     async toggleMute(): Promise<void> {
       if (!this.isCasting || !this.activeUuid) return;
-      const statusStore = useStatusStore();
       const willMute = !(this.tvMuted ?? false);
       try {
         await dlnaControl(this.activeUuid, "mute", willMute ? 1 : 0);
+        // 仅更新电视静音镜像，绝不触碰用户本地音量设置（playVolume 已持久化）
         this.tvMuted = willMute;
-        // 设置成功后才同步本地展示（音量图标/百分比跟随）
-        if (willMute) {
-          statusStore.playVolumeMute = statusStore.playVolume;
-          statusStore.playVolume = 0;
-        } else {
-          statusStore.playVolume = statusStore.playVolumeMute || 0.7;
-        }
       } catch {
         // 设置失败不动本地状态，避免与电视实际状态不一致
       }
@@ -501,15 +493,9 @@ export const useDlnaStore = defineStore("dlna", {
               // 镜像失败忽略，下轮轮询继续
             }
           }
-          // 同步电视音量/静音到本地展示（用户刚调过音量时短暂跳过，防回跳）
+          // 同步电视音量/静音镜像（仅供投送态 UI 展示，不触碰用户本地音量设置）
           if (state.volume != null) {
             this.tvVolume = state.volume;
-            if (Date.now() - this.lastVolumeChangeAt > 2000) {
-              const vol01 = state.volume / 100;
-              if (Math.abs(useStatusStore().playVolume - vol01) > 0.01) {
-                useStatusStore().playVolume = vol01;
-              }
-            }
           }
           if (state.muted != null) {
             this.tvMuted = state.muted;
