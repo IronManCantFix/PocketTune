@@ -1,4 +1,5 @@
 // DLNA 局域网投送状态：设备列表、投送目标、投送状态与电视播放控制
+import { watch } from "vue";
 import { defineStore } from "pinia";
 import {
   dlnaDiscover,
@@ -341,3 +342,39 @@ export const useDlnaStore = defineStore("dlna", {
     pick: ["activeUuid"],
   },
 });
+
+// 投送全局联动是否已初始化（模块级单例，与组件挂载无关）
+let watchersReady = false;
+
+/**
+ * 注册投送全局联动（进程级单例，由任意 CastControl 实例挂载时触发一次）
+ * 1. 切歌联动：任何路径切歌（点播/上一首/下一首/随机/FM）都自动投送到电视
+ * 2. 本地播放拦截：投送态下引擎一旦开始播放立即压住，保证手机静音
+ */
+export const setupDlnaWatchers = (): void => {
+  if (watchersReady) return;
+  watchersReady = true;
+
+  const store = useDlnaStore();
+  const musicStore = useMusicStore();
+
+  // 切歌联动（单例 watch，覆盖所有切歌入口）
+  watch(
+    () => musicStore.playSong.id,
+    (songId, prev) => {
+      if (!store.isCasting) return;
+      if (songId == null || prev == null || songId === prev) return;
+      void store.handleSongChange(songId);
+    },
+  );
+
+  // 本地播放拦截：投送态下引擎 play 事件立即压住（兜底所有播放路径）
+  const audioManager = useAudioManager();
+  audioManager.addEventListener("play", () => {
+    if (!store.isCasting) return;
+    // 投送中（正在换源）时先放行，由 castUrl 完成后统一静音
+    if (store.changingSong) return;
+    audioManager.pause();
+    useStatusStore().playStatus = true;
+  });
+};

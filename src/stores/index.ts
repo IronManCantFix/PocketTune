@@ -4,7 +4,7 @@ export { useMusicStore } from "./music";
 export { useDataStore } from "./data";
 
 // dlna 局域网投送
-export { useDlnaStore } from "./dlna";
+export { useDlnaStore, setupDlnaWatchers } from "./dlna";
 
 // local-localforage
 export { useLocalStore } from "./local";
