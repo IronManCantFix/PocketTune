@@ -18,7 +18,7 @@ import { useAudioManager } from "@/core/player/AudioManager";
 import { usePlayerController } from "@/core/player/PlayerController";
 import { useSongManager } from "@/core/player/SongManager";
 import { useLyricManager } from "@/core/player/LyricManager";
-import { useMusicStore, useStatusStore, useDataStore } from "@/stores";
+import { useMusicStore, useStatusStore, useDataStore, useSettingStore } from "@/stores";
 import type { SongType } from "@/types/main";
 import type { LyricLine } from "@applemusic-like-lyrics/lyric";
 
@@ -275,7 +275,9 @@ export const useDlnaStore = defineStore("dlna", {
         this.activeUuid = uuid;
         // 等待歌词就绪，避免投送时烧录旧歌词
         await this.waitForLyricReady();
-        const taskId = await dlnaPlay(uuid, url, this.getCurrentCover(), this.getCastMeta());
+        // 关闭封面视频合成时传空封面：服务端跳过合成走纯音频直投
+        const castCover = useSettingStore().dlnaCastVideo ? this.getCurrentCover() : undefined;
+        const taskId = await dlnaPlay(uuid, url, castCover, this.getCastMeta());
         // 任务提交成功即静音本地（封面合成耗时长，避免投送期间手机继续出声）
         useAudioManager().setVolume(0);
         // 元素级静音：切后台直放会绕过增益节点，仅音量置 0 会漏音
@@ -374,7 +376,9 @@ export const useDlnaStore = defineStore("dlna", {
       try {
         // 切歌投送同样等待歌词就绪，避免烧录上一首歌的歌词
         await this.waitForLyricReady();
-        const taskId = await dlnaPlay(this.activeUuid, url, cover, this.getCastMeta());
+        // 关闭封面视频合成时传空封面：服务端跳过合成走纯音频直投
+        const castCover = useSettingStore().dlnaCastVideo ? cover : undefined;
+        const taskId = await dlnaPlay(this.activeUuid, url, castCover, this.getCastMeta());
         const ok = await this.awaitTaskResult(taskId, 120000, this.activeUuid);
         if (!ok) return false;
         this.castingSongId = songId ?? null;
@@ -402,6 +406,8 @@ export const useDlnaStore = defineStore("dlna", {
      */
     async prewarmNextSong(): Promise<void> {
       if (!this.isCasting || !this.activeUuid) return;
+      // 纯音频直投模式无视频可预合成
+      if (!useSettingStore().dlnaCastVideo) return;
       // 单曲循环不会播下一首，无需预合成
       if (useStatusStore().repeatMode === "one") return;
       const statusStore = useStatusStore();
@@ -428,6 +434,8 @@ export const useDlnaStore = defineStore("dlna", {
         if (!source?.url || source.id !== nextSong.id || !isCastableUrl(source.url)) return;
         // 歌词与播放管线同源处理，保证预合成缓存 key 与真实投送一致
         const lines = await lyricManager.getPrewarmLyricLines(nextSong);
+        // 歌词预取失败时无法保证缓存 key 一致，跳过预合成（切歌时常规合成）
+        if (lines === null) return;
         this.lastPrewarmedSongId = nextSong.id;
         await dlnaPrewarm({
           url: source.url,

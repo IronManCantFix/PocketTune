@@ -472,6 +472,20 @@ export const usePlaySettings = (): SettingConfig => {
               },
             ],
           },
+          {
+            key: "dlnaCastVideo",
+            label: "投送电视时合成封面视频",
+            type: "switch",
+            description: computed(() =>
+              settingStore.dlnaCastVideo
+                ? "电视全屏显示封面并烧录歌词字幕；首次切歌需后台合成（已自动预合成下一首）"
+                : "纯音频直投：切歌秒切且保留原始音质，封面/歌词显示依电视而定",
+            ),
+            value: settingValue(
+              () => settingStore.dlnaCastVideo,
+              (v) => (settingStore.dlnaCastVideo = v),
+            ),
+          },
         ],
       },
     ],

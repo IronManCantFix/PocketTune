@@ -12,6 +12,7 @@ import {
   dlnaSetVolume,
   dlnaSetMute,
   buildDidlMetadata,
+  audioMimeFromUrl,
 } from "./avtransport";
 import { discoverWithDebug, getDevice, refreshDevices, startDeviceWatcher } from "./deviceManager";
 import { ensureCoverMedia, getMediaFile, ensureTokenIndex } from "./media";
@@ -144,8 +145,14 @@ const runCastTask = (taskId: number, input: CastTaskInput): void => {
         serverLog.info(`📤 DLNA 投送: ${device.name} ← ${finalUrl}`);
         // 按媒体类型构造 DIDL-Lite 元数据（严格的原生渲染器要求非空元数据）
         const isVideo = finalUrl.includes("/api/dlna/media");
-        const mime = isVideo ? "video/mp4" : "audio/mpeg";
-        const meta = buildDidlMetadata(finalUrl, input.title || "PocketTune", mime);
+        // 纯音频直投：按扩展名推断真实 MIME，并携带封面供电视端展示
+        const mime = isVideo ? "video/mp4" : audioMimeFromUrl(finalUrl);
+        const meta = buildDidlMetadata(
+          finalUrl,
+          input.title || "PocketTune",
+          mime,
+          isVideo ? undefined : input.coverAbsolute,
+        );
         return dlnaSetUriAndPlay(device, finalUrl, meta);
       });
       castTasks.set(taskId, { state: "done", message: "投送成功", createdAt: Date.now() });
@@ -339,7 +346,13 @@ export const initDlnaAPI = async (fastify: FastifyInstance): Promise<void> => {
       }
       const coverAbsolute = cover ? (normalizeUrl(req, cover) ?? cover) : undefined;
       // 后台执行不阻塞响应；与真实投送共用 ensureCoverMedia（同 key 命中缓存，inFlight 去重）
-      void ensureCoverMedia(targetUrl, coverAbsolute, lyrics, { title, artist }, songId != null ? String(songId) : undefined)
+      void ensureCoverMedia(
+        targetUrl,
+        coverAbsolute,
+        lyrics,
+        { title, artist },
+        songId != null ? String(songId) : undefined,
+      )
         .then((result) =>
           serverLog.info(
             result
@@ -348,7 +361,10 @@ export const initDlnaAPI = async (fastify: FastifyInstance): Promise<void> => {
           ),
         )
         .catch((error) =>
-          serverLog.warn("⚠️ 预合成异常（已忽略）:", error instanceof Error ? error.message : error),
+          serverLog.warn(
+            "⚠️ 预合成异常（已忽略）:",
+            error instanceof Error ? error.message : error,
+          ),
         );
       return reply.send({ code: 200, message: "预合成已提交" });
     },

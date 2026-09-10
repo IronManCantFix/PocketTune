@@ -131,17 +131,59 @@ const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout
 const escapeXml = (value: string): string =>
   value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
+// 安全提取 URL 扩展名（失败返回空串）
+const safePathExt = (url: string): string => {
+  try {
+    const pathname = new URL(url).pathname;
+    return pathname.includes(".") ? pathname.slice(pathname.lastIndexOf(".") + 1) : "";
+  } catch {
+    return "";
+  }
+};
+
+/**
+ * 按音频地址扩展名推断 MIME（推断失败回退 audio/mpeg，多数渲染器会嗅探实际格式）
+ * @param url 音频地址
+ */
+export const audioMimeFromUrl = (url: string): string => {
+  const ext = (safePathExt(url) || "").toLowerCase();
+  const mimeMap: Record<string, string> = {
+    mp3: "audio/mpeg",
+    flac: "audio/flac",
+    m4a: "audio/mp4",
+    aac: "audio/aac",
+    wav: "audio/wav",
+    ogg: "audio/ogg",
+    oga: "audio/ogg",
+    opus: "audio/ogg",
+    ape: "audio/ape",
+    wma: "audio/x-ms-wma",
+  };
+  return mimeMap[ext] ?? "audio/mpeg";
+};
+
 /**
  * 构造 DIDL-Lite 元数据（严格的原生渲染器常要求非空元数据才接受 URI 并拉流）
  * @param url 媒体地址
  * @param title 标题
  * @param mime MIME 类型
+ * @param albumArt 音频投送的封面地址（写入 albumArtURI，电视端展示依渲染器而定）
  */
-export const buildDidlMetadata = (url: string, title: string, mime: string): string => {
+export const buildDidlMetadata = (
+  url: string,
+  title: string,
+  mime: string,
+  albumArt?: string,
+): string => {
   // 视频投送声明 videoItem，避免严格渲染器按音频处理
   const upnpClass = mime.startsWith("video/")
     ? "object.item.videoItem.movie"
     : "object.item.audioItem.musicTrack";
+  // 音频投送且带封面时附加 albumArtURI（纯音频直投模式下电视端封面展示用）
+  const albumArtXml =
+    !mime.startsWith("video/") && albumArt
+      ? `<upnp:albumArtURI>${escapeXml(albumArt)}</upnp:albumArtURI>`
+      : "";
   return (
     `<DIDL-Lite xmlns="urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/" ` +
     `xmlns:dc="http://purl.org/dc/elements/1.1/" ` +
@@ -149,6 +191,7 @@ export const buildDidlMetadata = (url: string, title: string, mime: string): str
     `<item id="0" restricted="1">` +
     `<dc:title>${escapeXml(title)}</dc:title>` +
     `<upnp:class>${upnpClass}</upnp:class>` +
+    albumArtXml +
     `<res protocolInfo="http-get:*:${mime}:*">${escapeXml(url)}</res>` +
     `</item></DIDL-Lite>`
   );
