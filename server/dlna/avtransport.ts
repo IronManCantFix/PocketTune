@@ -165,31 +165,36 @@ export const audioMimeFromUrl = (url: string): string => {
 /**
  * 构造 DIDL-Lite 元数据（严格的原生渲染器常要求非空元数据才接受 URI 并拉流）
  * @param url 媒体地址
- * @param title 标题
  * @param mime MIME 类型
- * @param albumArt 音频投送的封面地址（写入 albumArtURI，电视端展示依渲染器而定）
+ * @param meta 展示元数据：标题/歌手/专辑/封面（电视端 now-playing 展示用）
  */
 export const buildDidlMetadata = (
   url: string,
-  title: string,
   mime: string,
-  albumArt?: string,
+  meta: { title: string; artist?: string; album?: string; albumArt?: string },
 ): string => {
   // 视频投送声明 videoItem，避免严格渲染器按音频处理
   const upnpClass = mime.startsWith("video/")
     ? "object.item.videoItem.movie"
     : "object.item.audioItem.musicTrack";
+  // 歌手双写 upnp:artist 与 dc:creator，兼容不同渲染器的读取习惯
+  const artistXml = meta.artist
+    ? `<upnp:artist>${escapeXml(meta.artist)}</upnp:artist><dc:creator>${escapeXml(meta.artist)}</dc:creator>`
+    : "";
+  const albumXml = meta.album ? `<upnp:album>${escapeXml(meta.album)}</upnp:album>` : "";
   // 音频投送且带封面时附加 albumArtURI（纯音频直投模式下电视端封面展示用）
   const albumArtXml =
-    !mime.startsWith("video/") && albumArt
-      ? `<upnp:albumArtURI>${escapeXml(albumArt)}</upnp:albumArtURI>`
+    !mime.startsWith("video/") && meta.albumArt
+      ? `<upnp:albumArtURI>${escapeXml(meta.albumArt)}</upnp:albumArtURI>`
       : "";
   return (
     `<DIDL-Lite xmlns="urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/" ` +
     `xmlns:dc="http://purl.org/dc/elements/1.1/" ` +
     `xmlns:upnp="urn:schemas-upnp-org:metadata-1-0/upnp/">` +
     `<item id="0" restricted="1">` +
-    `<dc:title>${escapeXml(title)}</dc:title>` +
+    `<dc:title>${escapeXml(meta.title)}</dc:title>` +
+    artistXml +
+    albumXml +
     `<upnp:class>${upnpClass}</upnp:class>` +
     albumArtXml +
     `<res protocolInfo="http-get:*:${mime}:*">${escapeXml(url)}</res>` +

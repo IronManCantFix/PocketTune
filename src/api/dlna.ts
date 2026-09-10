@@ -99,12 +99,19 @@ export const dlnaPlay = async (
   uuid: string,
   url: string,
   cover?: string,
-  options?: { title?: string; artist?: string; lyrics?: DlnaLyricLine[]; songId?: number },
+  options?: {
+    title?: string;
+    artist?: string;
+    album?: string;
+    lyrics?: DlnaLyricLine[];
+    songId?: number;
+  },
 ): Promise<number> => {
   const data: Record<string, unknown> = { uuid, url };
   if (cover) data.cover = cover;
   if (options?.title) data.title = options.title;
   if (options?.artist) data.artist = options.artist;
+  if (options?.album) data.album = options.album;
   if (options?.lyrics?.length) data.lyrics = options.lyrics;
   // 传歌曲 id 供服务端稳定缓存 key
   if (options?.songId != null) data.songId = options.songId;

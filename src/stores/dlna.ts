@@ -348,15 +348,24 @@ export const useDlnaStore = defineStore("dlna", {
     /**
      * 收集投送元数据（歌名/歌手/歌词，封面视频烧录字幕用；songId 供服务端缓存 key）
      */
-    getCastMeta(): { title?: string; artist?: string; lyrics?: DlnaLyricLine[]; songId?: number } {
+    getCastMeta(): {
+      title?: string;
+      artist?: string;
+      album?: string;
+      lyrics?: DlnaLyricLine[];
+      songId?: number;
+    } {
       const musicStore = useMusicStore();
       const song = musicStore.playSong;
       const artistName = Array.isArray(song?.artists)
         ? song.artists.map((a) => a.name).join(" / ")
         : (song?.artists as string) || "";
+      const albumName =
+        typeof song?.album === "string" ? song.album || undefined : song?.album?.name || undefined;
       return {
         title: song?.name,
         artist: artistName,
+        album: albumName,
         lyrics: toDlnaLyrics(musicStore.songLyric?.lrcData),
         songId: song?.id,
       };

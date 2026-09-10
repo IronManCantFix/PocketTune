@@ -91,6 +91,7 @@ interface CastTaskInput {
   coverAbsolute?: string;
   title?: string;
   artist?: string;
+  album?: string;
   /** 歌曲 id（可选，参与媒体缓存 key，签名参数变化仍命中缓存） */
   songId?: number;
   /** 电视可访问的入口基址（DLNA_BASE_URL 优先，否则为请求 host），合成媒体地址拼接用 */
@@ -147,12 +148,12 @@ const runCastTask = (taskId: number, input: CastTaskInput): void => {
         const isVideo = finalUrl.includes("/api/dlna/media");
         // 纯音频直投：按扩展名推断真实 MIME，并携带封面供电视端展示
         const mime = isVideo ? "video/mp4" : audioMimeFromUrl(finalUrl);
-        const meta = buildDidlMetadata(
-          finalUrl,
-          input.title || "PocketTune",
-          mime,
-          isVideo ? undefined : input.coverAbsolute,
-        );
+        const meta = buildDidlMetadata(finalUrl, mime, {
+          title: input.title || "PocketTune",
+          artist: input.artist,
+          album: input.album,
+          albumArt: isVideo ? undefined : input.coverAbsolute,
+        });
         return dlnaSetUriAndPlay(device, finalUrl, meta);
       });
       castTasks.set(taskId, { state: "done", message: "投送成功", createdAt: Date.now() });
@@ -271,6 +272,7 @@ export const initDlnaAPI = async (fastify: FastifyInstance): Promise<void> => {
           cover?: string;
           title?: string;
           artist?: string;
+          album?: string;
           /** 当前歌曲 id（可选，参与媒体缓存 key） */
           songId?: number;
           lyrics?: {
@@ -283,7 +285,7 @@ export const initDlnaAPI = async (fastify: FastifyInstance): Promise<void> => {
       }>,
       reply: FastifyReply,
     ) => {
-      const { uuid, url, cover, title, artist, songId, lyrics } = req.body ?? {};
+      const { uuid, url, cover, title, artist, album, songId, lyrics } = req.body ?? {};
       if (!uuid || !url) {
         return reply.code(400).send({ code: 400, message: "缺少 uuid 或 url 参数" });
       }
@@ -307,6 +309,7 @@ export const initDlnaAPI = async (fastify: FastifyInstance): Promise<void> => {
         coverAbsolute,
         title,
         artist,
+        album,
         songId,
         tvBase,
         lyrics,
