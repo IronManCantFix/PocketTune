@@ -9,6 +9,7 @@ import {
   dlnaStop,
   dlnaSeek,
   dlnaGetStatus,
+  buildDidlMetadata,
 } from "./avtransport";
 import { discoverWithDebug, getDevice, refreshDevices, startDeviceWatcher } from "./deviceManager";
 import { ensureCoverMedia, getMediaFile } from "./media";
@@ -160,7 +161,11 @@ export const initDlnaAPI = async (fastify: FastifyInstance): Promise<void> => {
         await withDeviceRetry(uuid, (device) => {
           // 记录投送目标与最终拉流地址，便于验证 DLNA_BASE_URL 是否生效
           serverLog.info(`📤 DLNA 投送: ${device.name} ← ${targetUrl}`);
-          return dlnaSetUriAndPlay(device, targetUrl);
+          // 按媒体类型构造 DIDL-Lite 元数据（严格的原生渲染器要求非空元数据）
+          const isVideo = targetUrl.includes("/api/dlna/media");
+          const mime = isVideo ? "video/mp4" : "audio/mpeg";
+          const meta = buildDidlMetadata(targetUrl, title || "PocketTune", mime);
+          return dlnaSetUriAndPlay(device, targetUrl, meta);
         });
         return reply.send({ code: 200, message: "投送成功" });
       } catch (error) {

@@ -108,6 +108,26 @@ const escapeSoapValue = (value: string): string =>
 // 延时工具
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
+// XML 文本节点转义（DIDL 内部用）
+const escapeXml = (value: string): string =>
+  value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+
+/**
+ * 构造 DIDL-Lite 元数据（严格的原生渲染器常要求非空元数据才接受 URI 并拉流）
+ * @param url 媒体地址
+ * @param title 标题
+ * @param mime MIME 类型
+ */
+export const buildDidlMetadata = (url: string, title: string, mime: string): string =>
+  `<DIDL-Lite xmlns="urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/" ` +
+  `xmlns:dc="http://purl.org/dc/elements/1.1/" ` +
+  `xmlns:upnp="urn:schemas-upnp-org:metadata-1-0/upnp/">` +
+  `<item id="0" restricted="1">` +
+  `<dc:title>${escapeXml(title)}</dc:title>` +
+  `<upnp:class>object.item.audioItem.musicTrack</upnp:class>` +
+  `<res protocolInfo="http-get:*:${mime}:*">${escapeXml(url)}</res>` +
+  `</item></DIDL-Lite>`;
+
 /**
  * 设置渲染器播放地址并播放
  * SetURI 后电视需要时间切换流，Play 延后执行；Play 失败降级为日志
