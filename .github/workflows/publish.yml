@@ -78,14 +78,13 @@ jobs:
         with:
           context: .
           file: ./Dockerfile
-          platforms: |
-            linux/amd64
-            linux/arm64
+          # 仅构建 amd64：目标部署环境为 x86 NAS，arm64 的 QEMU 模拟构建过慢
+          platforms: linux/amd64
           push: true
           tags: |
             ${{ steps.image.outputs.name }}:${{ steps.version.outputs.new }}
             ${{ steps.image.outputs.name }}:latest
           labels: ${{ steps.meta.outputs.labels }}
-          # GHA 层缓存：lockfile/源码未变时跳过 pnpm install 等重步骤（arm64 QEMU 下收益极大）
+          # GHA 层缓存：lockfile/源码未变时跳过 pnpm install 等重步骤
           cache-from: type=gha
           cache-to: type=gha,mode=max
