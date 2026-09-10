@@ -59,7 +59,7 @@ const normalizeUrl = (req: FastifyRequest, rawUrl: string): string | null => {
  * 投送任务状态（封面视频合成耗时长，投送请求立即返回，前端轮询任务结果）
  */
 interface CastTask {
-  state: "pending" | "done" | "error";
+  state: "pending" | "running" | "done" | "error" | "cancelled";
   message: string;
   createdAt: number;
 }
@@ -72,10 +72,11 @@ const TASK_RETENTION = 10 * 60 * 1000;
 // 投送串行队列：保证快速连续切歌时电视最终播放最新任务（避免并发覆盖错乱）
 let castQueue: Promise<void> = Promise.resolve();
 
-// 清理过期任务
+// 清理过期任务（pending/running 保留，避免误删未执行任务导致前端误报失效）
 const pruneCastTasks = (): void => {
   const cutoff = Date.now() - TASK_RETENTION;
   for (const [id, task] of castTasks) {
+    if (task.state === "pending" || task.state === "running") continue;
     if (task.createdAt < cutoff) castTasks.delete(id);
   }
 };
@@ -89,6 +90,8 @@ interface CastTaskInput {
   coverAbsolute?: string;
   title?: string;
   artist?: string;
+  /** 歌曲 id（可选，参与媒体缓存 key，签名参数变化仍命中缓存） */
+  songId?: number;
   /** 电视可访问的入口基址（DLNA_BASE_URL 优先，否则为请求 host），合成媒体地址拼接用 */
   tvBase: string;
   lyrics?: {
@@ -105,6 +108,10 @@ interface CastTaskInput {
  */
 const runCastTask = (taskId: number, input: CastTaskInput): void => {
   const task = async (): Promise<void> => {
+    // 任务不存在或已取消：直接跳过，不执行也不覆盖状态（检查与置位同处同步段，无竞态）
+    const current = castTasks.get(taskId);
+    if (!current || current.state === "cancelled") return;
+    castTasks.set(taskId, { ...current, state: "running", message: "投送执行中" });
     try {
       // 封面视频模式：合成封面 + 音频的视频流，电视全屏显示封面与歌词（失败降级纯音频）
       let finalUrl = input.targetUrl;
@@ -115,6 +122,8 @@ const runCastTask = (taskId: number, input: CastTaskInput): void => {
             input.coverAbsolute,
             input.lyrics,
             { title: input.title, artist: input.artist },
+            // songId 参与缓存 key：同一首歌签名参数变化仍命中缓存
+            input.songId != null ? String(input.songId) : undefined,
           );
           if (mediaUrl) {
             // 生成的媒体为相对地址，补全为电视可达基址（与 normalizeUrl 相对分支一致）
@@ -201,6 +210,49 @@ export const initDlnaAPI = async (fastify: FastifyInstance): Promise<void> => {
     }
   });
 
+  // 投送前连通性探测：验证设备 SOAP 控制链路真实可达
+  // 含端口漂移自愈：控制地址失效时自动重扫并重试一次
+  fastify.post(
+    "/dlna/probe",
+    async (req: FastifyRequest<{ Body: { uuid?: string } }>, reply: FastifyReply) => {
+      const { uuid } = req.body ?? {};
+      if (!uuid) {
+        return reply.code(400).send({ code: 400, message: "缺少 uuid 参数" });
+      }
+      // 设备缓存未命中时 getDevice 会自动补扫
+      let device = await getDevice(uuid);
+      let reachable = false;
+      if (device) {
+        try {
+          await dlnaGetStatus(device);
+          reachable = true;
+        } catch {
+          reachable = false;
+        }
+      }
+      // 不可达：电视服务端口可能已漂移，强制重扫后重试一次
+      if (!reachable) {
+        await refreshDevices(true);
+        device = await getDevice(uuid);
+        if (device) {
+          try {
+            await dlnaGetStatus(device);
+            reachable = true;
+          } catch {
+            reachable = false;
+          }
+        }
+      }
+      if (!reachable) {
+        serverLog.warn("⚠️ 设备连通性探测失败:", uuid);
+      }
+      return reply.send({
+        code: 200,
+        data: { uuid, reachable, name: device?.name ?? null },
+      });
+    },
+  );
+
   // 投送媒体到目标设备并播放（异步任务：立即返回 taskId，前端轮询任务结果）
   fastify.post(
     "/dlna/play",
@@ -212,6 +264,8 @@ export const initDlnaAPI = async (fastify: FastifyInstance): Promise<void> => {
           cover?: string;
           title?: string;
           artist?: string;
+          /** 当前歌曲 id（可选，参与媒体缓存 key） */
+          songId?: number;
           lyrics?: {
             startTime: number;
             endTime: number;
@@ -222,7 +276,7 @@ export const initDlnaAPI = async (fastify: FastifyInstance): Promise<void> => {
       }>,
       reply: FastifyReply,
     ) => {
-      const { uuid, url, cover, title, artist, lyrics } = req.body ?? {};
+      const { uuid, url, cover, title, artist, songId, lyrics } = req.body ?? {};
       if (!uuid || !url) {
         return reply.code(400).send({ code: 400, message: "缺少 uuid 或 url 参数" });
       }
@@ -240,7 +294,16 @@ export const initDlnaAPI = async (fastify: FastifyInstance): Promise<void> => {
       const taskId = ++castTaskSeq;
       castTasks.set(taskId, { state: "pending", message: "", createdAt: Date.now() });
       pruneCastTasks();
-      runCastTask(taskId, { uuid, targetUrl, coverAbsolute, title, artist, tvBase, lyrics });
+      runCastTask(taskId, {
+        uuid,
+        targetUrl,
+        coverAbsolute,
+        title,
+        artist,
+        songId,
+        tvBase,
+        lyrics,
+      });
       return reply.send({ code: 200, data: { taskId }, message: "投送任务已提交" });
     },
   );
@@ -258,6 +321,19 @@ export const initDlnaAPI = async (fastify: FastifyInstance): Promise<void> => {
         return reply.send({ code: 200, data: null });
       }
       return reply.send({ code: 200, data: { state: task.state, message: task.message } });
+    },
+  );
+
+  // 取消投送任务：仅 pending 可取消，任务不存在/已运行/已完成时幂等返回成功
+  fastify.post(
+    "/dlna/task/cancel",
+    async (req: FastifyRequest<{ Body: { id?: number } }>, reply: FastifyReply) => {
+      const { id } = req.body ?? {};
+      const task = typeof id === "number" ? castTasks.get(id) : undefined;
+      if (typeof id === "number" && task && task.state === "pending") {
+        castTasks.set(id, { ...task, state: "cancelled", message: "已取消" });
+      }
+      return reply.send({ code: 200 });
     },
   );
 
@@ -282,11 +358,22 @@ export const initDlnaAPI = async (fastify: FastifyInstance): Promise<void> => {
         "X-Accel-Buffering": "no",
       };
       if (range) {
-        // 解析 bytes=start-end
+        // 解析 bytes=start-end（bytes=-N 为 suffix range，取末尾 N 字节）
         const match = /^bytes=(\d*)-(\d*)$/.exec(range);
         if (match) {
-          const start = match[1] ? Number(match[1]) : 0;
-          const end = match[2] ? Math.min(Number(match[2]), size - 1) : size - 1;
+          const rawStart = match[1];
+          const rawEnd = match[2];
+          let start: number;
+          let end: number;
+          if (!rawStart && rawEnd) {
+            // suffix range：start 为距文件末尾 rawEnd 字节处
+            const suffixLen = Math.min(Number(rawEnd), size);
+            start = size - suffixLen;
+            end = size - 1;
+          } else {
+            start = rawStart ? Number(rawStart) : 0;
+            end = rawEnd ? Math.min(Number(rawEnd), size - 1) : size - 1;
+          }
           if (Number.isNaN(start) || Number.isNaN(end) || start > end || start >= size) {
             return reply.code(416).header("Content-Range", `bytes */${size}`).send();
           }
@@ -372,7 +459,10 @@ export const initDlnaAPI = async (fastify: FastifyInstance): Promise<void> => {
         return reply.code(400).send({ code: 400, message: "缺少 uuid 参数" });
       }
       try {
-        const state = await withDeviceRetry(uuid, (device) => dlnaGetStatus(device));
+        // 状态轮询不做重扫重试：电视离线时避免高频轮询触发全网 SSDP 扫描
+        const device = await getDevice(uuid);
+        if (!device) throw new Error("设备不在线，请重新扫描");
+        const state = await dlnaGetStatus(device);
         return reply.send({ code: 200, data: state });
       } catch (error) {
         serverLog.error("❌ 状态查询失败:", error instanceof Error ? error.message : error);

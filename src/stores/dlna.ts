@@ -4,6 +4,7 @@ import { defineStore } from "pinia";
 import {
   dlnaDiscover,
   dlnaPlay,
+  dlnaProbe,
   dlnaTaskStatus,
   dlnaTaskCancel,
   dlnaControl,
@@ -214,9 +215,17 @@ export const useDlnaStore = defineStore("dlna", {
       const prevUuid = this.activeUuid;
       const prevCasting = this.isCasting;
       const wasLocalPlaying = useStatusStore().playStatus;
-      this.activeUuid = uuid;
       this.castingPending = true;
       try {
+        // 投送前连通性探测：不可达时保持本地播放，不进入投送态（避免静音/状态错乱）
+        const reachable = await dlnaProbe(uuid);
+        if (!reachable) {
+          window.$message.warning("设备不可达，已保持本地播放");
+          // 探测过程中后端可能已重扫到新端口，刷新设备列表
+          void this.discover();
+          return false;
+        }
+        this.activeUuid = uuid;
         // 等待歌词就绪，避免投送时烧录旧歌词
         await this.waitForLyricReady();
         const taskId = await dlnaPlay(uuid, url, this.getCurrentCover(), this.getCastMeta());
