@@ -86,3 +86,6 @@ jobs:
             ${{ steps.image.outputs.name }}:${{ steps.version.outputs.new }}
             ${{ steps.image.outputs.name }}:latest
           labels: ${{ steps.meta.outputs.labels }}
+          # GHA 层缓存：lockfile/源码未变时跳过 pnpm install 等重步骤（arm64 QEMU 下收益极大）
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
