@@ -235,14 +235,14 @@ const downloadCover = async (coverUrl: string): Promise<string | null> => {
  * @param audioUrl 音频地址（ffmpeg 直接拉流）
  * @param outFile 输出文件
  * @param assFile 字幕文件（可选）
- * @returns 成功返回输出文件路径，失败返回 null
+ * @returns ok 是否合成成功；killed 是否因超时被强制终止（供调用方跳过降级重试）
  */
 const runFfmpeg = (
   coverFile: string,
   audioUrl: string,
   outFile: string,
   assFile?: string | null,
-): Promise<boolean> =>
+): Promise<{ ok: boolean; killed: boolean }> =>
   new Promise((resolve) => {
     // 基础滤镜：封面等比缩放居中；有字幕时叠加烧录
     const baseFilter =
@@ -286,8 +286,10 @@ const runFfmpeg = (
       outFile,
     ];
     const child = spawn("ffmpeg", args, { stdio: ["ignore", "ignore", "pipe"] });
-    // 超时终止 ffmpeg 防挂起：close 将以非 0 触发，自然走失败路径
+    // 超时终止 ffmpeg 防挂起：close 将以非 0 触发，按超时被杀处理
+    let killed = false;
     const timer = setTimeout(() => {
+      killed = true;
       serverLog.warn(`⏱️ ffmpeg 合成超时（${FFMPEG_TIMEOUT_MS / 1000}s），已强制终止`);
       child.kill("SIGKILL");
     }, FFMPEG_TIMEOUT_MS);
@@ -299,15 +301,20 @@ const runFfmpeg = (
     child.on("error", (error) => {
       clearTimeout(timer);
       serverLog.error("❌ ffmpeg 启动失败:", error.message);
-      resolve(false);
+      resolve({ ok: false, killed: false });
     });
     child.on("close", (code) => {
       clearTimeout(timer);
+      // 超时被杀：与普通失败区分，调用方据此跳过无字幕降级重试
+      if (killed) {
+        resolve({ ok: false, killed: true });
+        return;
+      }
       if (code === 0) {
-        resolve(true);
+        resolve({ ok: true, killed: false });
       } else {
         serverLog.error(`❌ ffmpeg 合成失败 (code ${code}):`, stderrTail);
-        resolve(false);
+        resolve({ ok: false, killed: false });
       }
     });
   });
@@ -417,15 +424,17 @@ export const ensureCoverMedia = async (
         await writeFile(assFile, generateLyricAss(lyrics, meta ?? {}), "utf8");
       }
       serverLog.info(`🎬 开始合成封面视频流${assFile ? "（含歌词字幕）" : ""}...`);
-      let ok = await runFfmpeg(coverFile, audioUrl, outFile, assFile);
-      // 字幕烧录失败（如 ffmpeg 未编译 libass）：降级重试无字幕版本
-      if (!ok && assFile) {
+      let result = await runFfmpeg(coverFile, audioUrl, outFile, assFile);
+      // 仅普通失败时降级重试无字幕版本（如 ffmpeg 未编译 libass）；
+      // 超时被杀（多为直播流挂起）直接失败，避免重试再耗 90s 超过前端超时，
+      // 出现"先报超时、电视迟到大播放"的错乱窗口
+      if (!result.ok && !result.killed && assFile) {
         serverLog.warn("⚠️ 字幕烧录失败，降级为无字幕封面视频重试");
         await unlink(outFile).catch(() => undefined);
-        ok = await runFfmpeg(coverFile, audioUrl, outFile, null);
+        result = await runFfmpeg(coverFile, audioUrl, outFile, null);
       }
       // 合成失败清理半成品
-      if (!ok) {
+      if (!result.ok) {
         await unlink(outFile).catch(() => undefined);
         return null;
       }

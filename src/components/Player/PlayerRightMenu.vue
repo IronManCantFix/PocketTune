@@ -142,6 +142,13 @@ const handleClickOutside = (e: MouseEvent) => {
   showQualityPopover.value = false;
 };
 
+// 投送态音量节流下发（200ms，trailing 保证拖动结束的最终音量必下发），避免高频发送 SOAP 控制请求
+const throttledCastVolume = useThrottleFn(
+  (val: number) => void dlnaStore.setVolume(val),
+  200,
+  true,
+);
+
 // 音量模型：投送态绑定电视音量镜像（tvVolume/tvMuted），否则绑定本地音量（playVolume）
 // 两个音量体系彻底分离：电视音量绝不写入用户本地音量设置
 const volumeModel = computed<number>({
@@ -153,7 +160,7 @@ const volumeModel = computed<number>({
   },
   set: (val: number) => {
     if (dlnaStore.isCasting) {
-      void dlnaStore.setVolume(val);
+      throttledCastVolume(val);
       return;
     }
     player.setVolume(val);
