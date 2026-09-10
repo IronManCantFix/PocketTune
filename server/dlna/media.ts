@@ -13,6 +13,9 @@ import { serverLog } from "../utils/logger";
 const CACHE_DIR = path.join(os.tmpdir(), "dlna-media-cache");
 const MAX_CACHE_FILES = 50;
 
+// ffmpeg 合成超时：直播流/失效音源可能无限挂起，超时强杀防止串行队列卡死
+const FFMPEG_TIMEOUT_MS = 90_000;
+
 // 通用浏览器 UA（拉取音源与封面用）
 const BROWSER_UA =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36";
@@ -68,6 +71,7 @@ let cacheDirReady = false;
  * 毫秒转 ASS 时间格式 (H:MM:SS.cc)
  */
 const formatAssTime = (ms: number): string => {
+  ms = Math.max(0, ms); // 防止负 startTime 生成非法时间轴
   const totalSeconds = Math.floor(ms / 1000);
   const centiseconds = Math.floor((ms % 1000) / 10);
   const hours = Math.floor(totalSeconds / 3600);
@@ -92,6 +96,9 @@ export interface LyricLineInput {
   translatedLyric?: string;
 }
 
+// ASS 文本转义：花括号会被 libass 解析为 override 标签，替换为全角避免破坏样式
+const escapeAssText = (text: string): string => text.replace(/\{/g, "｛").replace(/\}/g, "｝");
+
 /**
  * 生成 ASS 字幕（后端精简版）
  * KTV 风格：当前句白色大字（含翻译小字）+ 下一句灰色预览，随播放逐句滚动
@@ -106,7 +113,7 @@ Title: ${meta.title ?? "PocketTune"} - ${meta.artist ?? ""}
 ScriptType: v4.00+
 WrapStyle: 0
 ScaledBorderAndShadow: yes
-PlayResX: 720
+PlayResX: 1280
 PlayResY: 720
 
 [V4+ Styles]
@@ -119,10 +126,9 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 `;
 
   const events: string[] = [];
-  // 顶部歌名/歌手（全程显示）
-  events.push(
-    `Dialogue: 0,0:00:00.00,9:59:59.00,Meta,,0,0,0,,${(meta.title ?? "") + " - " + (meta.artist ?? "")}`,
-  );
+  // 顶部歌名/歌手（全程显示），文本过转义防花括号破坏样式
+  const metaText = escapeAssText(`${meta.title ?? ""} - ${meta.artist ?? ""}`);
+  events.push(`Dialogue: 0,0:00:00.00,9:59:59.00,Meta,,0,0,0,,${metaText}`);
 
   // 逐句生成：当前句（亮白，含翻译小字）+ 下一句（灰色预览）同框显示
   for (let i = 0; i < lines.length; i += 1) {
@@ -131,13 +137,13 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     const currentText = current.words?.trim();
     if (!currentText) continue;
 
-    // 组装文本：当前句（白色）→ 翻译（小字浅灰）→ 下一句（灰色预览）
-    let text = currentText;
+    // 组装文本：当前句（白色）→ 翻译（小字浅灰）→ 下一句（灰色预览），歌词文本均过转义
+    let text = escapeAssText(currentText);
     if (current.translatedLyric?.trim()) {
-      text += `{\\fs30\\c&HD0D0D0&}\\N${current.translatedLyric.trim()}`;
+      text += `{\\fs30\\c&HD0D0D0&}\\N${escapeAssText(current.translatedLyric.trim())}`;
     }
     if (next?.words?.trim()) {
-      text += `{\\r\\c&H787878&\\fs46}\\N${next.words.trim()}`;
+      text += `{\\r\\c&H787878&\\fs46}\\N${escapeAssText(next.words.trim())}`;
     }
 
     // 当前句显示到下一句开始（无缝衔接），末句多显示 3 秒兜底
@@ -151,13 +157,31 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 // 缓存版本盐：影响视频输出的部署变更（字体/编码参数/字幕样式）时递增，使旧缓存全部失效
 const CACHE_VERSION = "2"; // v2 = 引入中文字体后的字幕版本
 
+// 提取 URL 路径（剥离时效签名参数），解析失败回退原字符串
+const urlPathname = (url: string): string => {
+  try {
+    return new URL(url).pathname;
+  } catch {
+    return url;
+  }
+};
+
 /**
  * 计算媒体缓存 key 与 token
+ * 传 cacheKey（如歌曲 id）时用 song:id + 音频路径作 key，签名参数变化不再 miss
  */
-const mediaKey = (audioUrl: string, coverUrl?: string, lyricDigest = ""): string =>
-  createHash("md5")
-    .update(`${CACHE_VERSION}|${audioUrl}|${coverUrl ?? ""}|${lyricDigest}`)
-    .digest("hex");
+const mediaKey = (
+  audioUrl: string,
+  coverUrl?: string,
+  lyricDigest = "",
+  cacheKey?: string,
+): string => {
+  const raw =
+    cacheKey != null
+      ? `${CACHE_VERSION}|song:${cacheKey}|${urlPathname(audioUrl)}|${coverUrl ?? ""}|${lyricDigest}`
+      : `${CACHE_VERSION}|${audioUrl}|${coverUrl ?? ""}|${lyricDigest}`;
+  return createHash("md5").update(raw).digest("hex");
+};
 
 /**
  * 按目标域名挑选 Referer 后的请求头
@@ -222,7 +246,7 @@ const runFfmpeg = (
   new Promise((resolve) => {
     // 基础滤镜：封面等比缩放居中；有字幕时叠加烧录
     const baseFilter =
-      "scale=720:720:force_original_aspect_ratio=decrease,pad=720:720:(ow-iw)/2:(oh-ih)/2";
+      "scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2";
     const videoFilter = assFile
       ? `${baseFilter},ass=${assFile.replace(/\\/g, "/").replace(/:/g, "\\:")}`
       : baseFilter;
@@ -251,7 +275,7 @@ const runFfmpeg = (
       "-pix_fmt",
       "yuv420p",
       "-r",
-      "2",
+      "5",
       "-c:a",
       "aac",
       "-b:a",
@@ -262,16 +286,23 @@ const runFfmpeg = (
       outFile,
     ];
     const child = spawn("ffmpeg", args, { stdio: ["ignore", "ignore", "pipe"] });
+    // 超时终止 ffmpeg 防挂起：close 将以非 0 触发，自然走失败路径
+    const timer = setTimeout(() => {
+      serverLog.warn(`⏱️ ffmpeg 合成超时（${FFMPEG_TIMEOUT_MS / 1000}s），已强制终止`);
+      child.kill("SIGKILL");
+    }, FFMPEG_TIMEOUT_MS);
     let stderrTail = "";
     child.stderr?.on("data", (chunk: Buffer) => {
       // 仅保留尾部错误信息用于诊断
       stderrTail = (stderrTail + chunk.toString("utf8")).slice(-400);
     });
     child.on("error", (error) => {
+      clearTimeout(timer);
       serverLog.error("❌ ffmpeg 启动失败:", error.message);
       resolve(false);
     });
     child.on("close", (code) => {
+      clearTimeout(timer);
       if (code === 0) {
         resolve(true);
       } else {
@@ -339,6 +370,7 @@ const pruneCache = async (): Promise<void> => {
  * @param coverUrl 封面地址
  * @param lyrics 歌词行（可选，传入时烧录滚动字幕）
  * @param meta 歌曲元数据（标题/歌手，字幕与顶部信息用）
+ * @param cacheKey 稳定缓存键（如歌曲 id），传入时音频地址仅取路径参与 key
  * @returns 可投送的媒体 URL（相对路径 /api/dlna/media?token=...），失败返回 null
  */
 export const ensureCoverMedia = async (
@@ -346,6 +378,7 @@ export const ensureCoverMedia = async (
   coverUrl?: string,
   lyrics?: LyricLineInput[],
   meta?: { title?: string; artist?: string },
+  cacheKey?: string,
 ): Promise<string | null> => {
   if (!cacheDirReady) {
     await mkdir(CACHE_DIR, { recursive: true });
@@ -357,7 +390,7 @@ export const ensureCoverMedia = async (
   const lyricDigest = lyrics?.length
     ? createHash("md5").update(JSON.stringify(lyrics)).digest("hex").slice(0, 8)
     : "";
-  const key = mediaKey(audioUrl, coverUrl, lyricDigest);
+  const key = mediaKey(audioUrl, coverUrl, lyricDigest, cacheKey);
   const outFile = path.join(CACHE_DIR, `${key}.mp4`);
 
   // 缓存命中：直接注册返回
