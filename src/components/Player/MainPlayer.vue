@@ -241,7 +241,7 @@
           </n-flex>
         </Transition>
         <!-- 功能区 -->
-        <CastControl />
+        <CastControl compact />
         <PlayerRightMenu />
       </n-flex>
     </Transition>

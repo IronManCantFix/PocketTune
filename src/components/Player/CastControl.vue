@@ -4,6 +4,11 @@
     <SvgIcon name="RssFeed" />
   </div>
 
+  <!-- 紧凑模式：投送态只显示高亮图标，避免窄区域（底部播放条）被状态条撑开 -->
+  <div v-else-if="compact" class="cast-btn cast-active" @click.stop="handleOpenCast">
+    <SvgIcon name="RssFeed" />
+  </div>
+
   <!-- 已投送：投送状态条 -->
   <div v-else class="cast-bar" @click.stop>
     <SvgIcon name="RssFeed" :size="16" class="cast-active-icon" />
@@ -37,6 +42,9 @@
 import { usePlayerController } from "@/core/player/PlayerController";
 import { useMusicStore, useStatusStore, useDlnaStore } from "@/stores";
 import { openCastModal } from "@/utils/modal";
+
+// 紧凑模式：窄区域（底部播放条）下投送态仅显示高亮图标，防止状态条撑开布局
+withDefaults(defineProps<{ compact?: boolean }>(), { compact: false });
 
 const dlnaStore = useDlnaStore();
 const player = usePlayerController();
@@ -123,6 +131,7 @@ onUnmounted(stopPolling);
 
 <style scoped lang="scss">
 .cast-btn {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -141,6 +150,24 @@ onUnmounted(stopPolling);
   &:hover {
     transform: scale(1.1);
     background-color: rgba(var(--primary), 0.28);
+  }
+}
+
+// 紧凑模式投送态：高亮图标，占位与未投送一致
+.cast-btn.cast-active {
+  .n-icon {
+    color: var(--primary-hex);
+    opacity: 1;
+  }
+  &::after {
+    content: "";
+    position: absolute;
+    right: 6px;
+    bottom: 6px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background-color: var(--primary-hex);
   }
 }
 
