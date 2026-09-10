@@ -5,6 +5,7 @@ import {
   dlnaDiscover,
   dlnaPlay,
   dlnaTaskStatus,
+  dlnaTaskCancel,
   dlnaControl,
   dlnaStatus,
   type DlnaDeviceInfo,
@@ -17,6 +18,9 @@ import { useMusicStore, useStatusStore } from "@/stores";
 
 // 通用延时
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+
+// 轮询防重入标记：上一轮请求未结束时跳过本轮，避免超时挂起时请求堆积
+let syncInFlight = false;
 
 interface DlnaState {
   /** 发现的设备列表 */
@@ -47,12 +51,10 @@ interface DlnaState {
   sliderDragging: boolean;
   /** 投送开始时本地是否在播放（断开投送时恢复用） */
   castStartedLocalPlaying: boolean;
-  /** 最近一次手动 seek 时间（自动连播保护，避免误切） */
-  lastManualSeekAt: number;
   /** 最近一次手动调音量时间（轮询音量回跳保护） */
   lastVolumeChangeAt: number;
-  /** 已自动切歌的歌曲 id（防止播完重复触发） */
-  lastAutoAdvanceSongId: number | null;
+  /** 轮询连续失败次数（超过阈值视为电视离线并自动退出投送） */
+  pollFailCount: number;
 }
 
 /**
@@ -83,9 +85,8 @@ export const useDlnaStore = defineStore("dlna", {
     tvMuted: null,
     sliderDragging: false,
     castStartedLocalPlaying: false,
-    lastManualSeekAt: 0,
     lastVolumeChangeAt: 0,
-    lastAutoAdvanceSongId: null,
+    pollFailCount: 0,
   }),
   getters: {
     /** 当前投送目标设备 */
@@ -136,22 +137,25 @@ export const useDlnaStore = defineStore("dlna", {
     },
 
     /**
-     * 投送成功后的本地状态收尾：暂停本地播放（避免手机与电视同时出声），并同步电视状态
+     * 投送静音：本地引擎以音量 0 镜像电视播放
+     * 不使用 pause 的原因：pause 会与播放引擎的 play() promise 竞态产生 AbortError，
+     * 且静音播放让本地进度/歌词与电视天然同步（音量操作仅作用于引擎，不改用户音量设置）
      */
-    pauseLocalAndSyncTv(): void {
+    muteLocalForCast(): void {
       const audioManager = useAudioManager();
-      // 暂停本地引擎（会同步触发引擎 pause 事件，重置 playStatus），随后覆盖为电视状态
-      audioManager.pause();
+      audioManager.setVolume(0);
+      // 本地未播放时以静音方式启动，保证进度跟随电视
+      void audioManager.resume().catch(() => undefined);
       useStatusStore().playStatus = true;
-      usePlayerController().syncMediaPlayMode?.();
     },
 
     /**
      * 等待投送任务完成（封面视频合成耗时长，轮询后端任务状态）
      * @param taskId 投送任务 id（0 表示旧后端，视为直接成功）
      * @param timeout 轮询超时（毫秒）
+     * @param targetUuid 超时兜底停止的目标设备（缺省用当前投送目标）
      */
-    async awaitTaskResult(taskId: number, timeout = 120000): Promise<boolean> {
+    async awaitTaskResult(taskId: number, timeout = 120000, targetUuid?: string): Promise<boolean> {
       // 兼容旧后端：未返回任务 id 时视为同步成功
       if (!taskId) return true;
       const start = Date.now();
@@ -167,9 +171,18 @@ export const useDlnaStore = defineStore("dlna", {
           window.$message.error(`投送失败：${task.message || "未知错误"}`);
           return false;
         }
+        if (task.state === "cancelled") {
+          window.$message.warning("投送已取消");
+          return false;
+        }
+        // pending / running：任务进行中，继续轮询
         await sleep(1000);
       }
       window.$message.warning("投送超时，请确认电视网络正常后重试");
+      // 取消服务端任务并停止电视，防止任务迟到成功导致手机与电视双出声
+      await dlnaTaskCancel(taskId).catch(() => undefined);
+      const stopTarget = targetUuid ?? this.activeUuid;
+      if (stopTarget) await dlnaControl(stopTarget, "stop").catch(() => undefined);
       return false;
     },
 
@@ -208,9 +221,9 @@ export const useDlnaStore = defineStore("dlna", {
         await this.waitForLyricReady();
         const taskId = await dlnaPlay(uuid, url, this.getCurrentCover(), this.getCastMeta());
         // 任务提交成功即静音本地（封面合成耗时长，避免投送期间手机继续出声）
-        useAudioManager().pause();
-        useStatusStore().playStatus = false;
-        const ok = await this.awaitTaskResult(taskId);
+        useAudioManager().setVolume(0);
+        // 显式传入本次投送目标，回滚前锁定，避免超时兜底停止到错误设备
+        const ok = await this.awaitTaskResult(taskId, 120000, uuid);
         if (!ok) {
           // 投送失败：回滚到原目标（原未投送时恢复未投送态），并恢复本地播放
           this.activeUuid = prevUuid;
@@ -226,7 +239,7 @@ export const useDlnaStore = defineStore("dlna", {
         this.castingSongName = currentSong?.name ?? "";
         this.castStartedLocalPlaying = wasLocalPlaying;
         // 投送成功：本地保持静音，由电视独占出声
-        this.pauseLocalAndSyncTv();
+        this.muteLocalForCast();
         return true;
       } catch (error) {
         window.$message.error(`投送失败：${error instanceof Error ? error.message : "未知错误"}`);
@@ -252,9 +265,9 @@ export const useDlnaStore = defineStore("dlna", {
     },
 
     /**
-     * 收集投送元数据（歌名/歌手/歌词，封面视频烧录字幕用）
+     * 收集投送元数据（歌名/歌手/歌词，封面视频烧录字幕用；songId 供服务端缓存 key）
      */
-    getCastMeta(): { title?: string; artist?: string; lyrics?: DlnaLyricLine[] } {
+    getCastMeta(): { title?: string; artist?: string; lyrics?: DlnaLyricLine[]; songId?: number } {
       const musicStore = useMusicStore();
       const song = musicStore.playSong;
       const artistName = Array.isArray(song?.artists)
@@ -274,6 +287,7 @@ export const useDlnaStore = defineStore("dlna", {
         title: song?.name,
         artist: artistName,
         lyrics: lyrics.length > 0 ? lyrics : undefined,
+        songId: song?.id,
       };
     },
 
@@ -292,17 +306,15 @@ export const useDlnaStore = defineStore("dlna", {
         // 切歌投送同样等待歌词就绪，避免烧录上一首歌的歌词
         await this.waitForLyricReady();
         const taskId = await dlnaPlay(this.activeUuid, url, cover, this.getCastMeta());
-        const ok = await this.awaitTaskResult(taskId);
+        const ok = await this.awaitTaskResult(taskId, 120000, this.activeUuid);
         if (!ok) return false;
         this.castingSongId = songId ?? null;
         this.castingSongName = musicStore.playSong?.name ?? "";
         // 切歌投送成功：同样立即暂停本地，防止新歌在手机出声
-        this.pauseLocalAndSyncTv();
+        this.muteLocalForCast();
         return true;
-      } catch (error) {
-        window.$message.error(
-          `自动投送失败：${error instanceof Error ? error.message : "未知错误"}`,
-        );
+      } catch {
+        // 失败提示由调用方负责，此处静默返回 false
         return false;
       } finally {
         this.castingPending = false;
@@ -314,11 +326,15 @@ export const useDlnaStore = defineStore("dlna", {
      */
     async togglePlay(): Promise<void> {
       if (!this.isCasting || !this.activeUuid) return;
+      const audioManager = useAudioManager();
       if (this.tvPlaying) {
+        // 本地镜像：电视暂停时本地引擎同步暂停（保持两端进度一致）
+        audioManager.pause();
         await dlnaControl(this.activeUuid, "pause");
         this.tvPlaying = false;
         useStatusStore().playStatus = false;
       } else {
+        audioManager.resume();
         await dlnaControl(this.activeUuid, "resume");
         this.tvPlaying = true;
         useStatusStore().playStatus = true;
@@ -351,11 +367,11 @@ export const useDlnaStore = defineStore("dlna", {
      */
     async seek(seconds: number): Promise<void> {
       if (!this.isCasting || !this.activeUuid) return;
-      this.lastManualSeekAt = Date.now();
       await dlnaControl(this.activeUuid, "seek", seconds);
       this.pollPosition = seconds;
-      // 同步本地进度显示
+      // 同步本地进度显示，并让本地引擎同步跳转（保持两端一致）
       useStatusStore().currentTime = Math.floor(seconds * 1000);
+      usePlayerController().setSeek(Math.floor(seconds * 1000));
     },
 
     /**
@@ -385,15 +401,15 @@ export const useDlnaStore = defineStore("dlna", {
       try {
         await dlnaControl(this.activeUuid, "mute", willMute ? 1 : 0);
         this.tvMuted = willMute;
+        // 设置成功后才同步本地展示（音量图标/百分比跟随）
+        if (willMute) {
+          statusStore.playVolumeMute = statusStore.playVolume;
+          statusStore.playVolume = 0;
+        } else {
+          statusStore.playVolume = statusStore.playVolumeMute || 0.7;
+        }
       } catch {
-        // 静音设置失败不打断本地操作
-      }
-      // 本地展示同步（音量图标/百分比跟随）
-      if (willMute) {
-        statusStore.playVolumeMute = statusStore.playVolume;
-        statusStore.playVolume = 0;
-      } else {
-        statusStore.playVolume = statusStore.playVolumeMute || 0.7;
+        // 设置失败不动本地状态，避免与电视实际状态不一致
       }
     },
 
@@ -423,7 +439,9 @@ export const useDlnaStore = defineStore("dlna", {
       this.castingPending = false;
       this.tvVolume = null;
       this.tvMuted = null;
-      this.lastAutoAdvanceSongId = null;
+      this.pollFailCount = 0;
+      // 恢复本地音量（投送期间本地引擎音量被置 0）
+      useAudioManager().setVolume(statusStore.playVolume);
       statusStore.playStatus = false;
       // 恢复本地播放（投送前本地在播放时），并按电视进度续播
       if (resumeLocal && wasLocalPlaying) {
@@ -436,6 +454,21 @@ export const useDlnaStore = defineStore("dlna", {
         } catch {
           // 恢复失败仅记录，不影响断开结果
         }
+      } else if (tvPosition > 0) {
+        // 不恢复播放时把引擎对齐到电视进度，避免 UI 进度与引擎位置不一致
+        usePlayerController().setSeek(Math.floor(tvPosition * 1000));
+      }
+    },
+
+    /**
+     * 轮询失败处理：连续多次失败视为电视已离线，自动退出投送，避免轮询空转
+     */
+    async handlePollFailure(): Promise<void> {
+      this.pollFailCount += 1;
+      if (this.pollFailCount >= 5) {
+        this.pollFailCount = 0;
+        window.$message.warning("电视连接已断开，已退出投送");
+        await this.disconnect();
       }
     },
 
@@ -444,23 +477,28 @@ export const useDlnaStore = defineStore("dlna", {
      */
     async syncPosition(): Promise<void> {
       if (!this.isCasting || !this.activeUuid) return;
+      // 防重入：上一轮请求未结束时跳过本轮，避免请求堆积
+      if (syncInFlight) return;
+      syncInFlight = true;
       try {
         const state: DlnaTransportState | null = await dlnaStatus(this.activeUuid);
         if (state) {
-          // 拖动进度条期间跳过进度回写，避免滑块回跳（播放状态仍更新）
-          if (!this.sliderDragging) {
-            this.pollPosition = state.currentTime;
-            this.tvPlaying = state.playing;
-            // 回写本地进度，驱动进度条与歌词（仅投送态下覆盖）
-            const statusStore = useStatusStore();
-            if (state.currentTime > 0) {
-              statusStore.currentTime = Math.floor(state.currentTime * 1000);
-            }
-            if (state.duration > 0) {
-              statusStore.duration = Math.floor(state.duration * 1000);
-            }
-            if (this.tvPlaying !== statusStore.playStatus) {
-              statusStore.playStatus = this.tvPlaying;
+          this.pollFailCount = 0;
+          this.pollPosition = state.currentTime;
+          this.tvPlaying = state.playing;
+          const statusStore = useStatusStore();
+          // 本地以静音方式镜像电视播放，进度/歌词由本地引擎天然驱动，无需回写
+          // 电视端状态变化（用户用电视遥控暂停/恢复）时镜像到本地引擎
+          if (state.playing !== statusStore.playStatus) {
+            statusStore.playStatus = state.playing;
+            try {
+              if (state.playing) {
+                void useAudioManager().resume();
+              } else {
+                useAudioManager().pause();
+              }
+            } catch {
+              // 镜像失败忽略，下轮轮询继续
             }
           }
           // 同步电视音量/静音到本地展示（用户刚调过音量时短暂跳过，防回跳）
@@ -476,45 +514,14 @@ export const useDlnaStore = defineStore("dlna", {
           if (state.muted != null) {
             this.tvMuted = state.muted;
           }
-          // 电视播完自动切下一首（投送态自动连播）
-          this.checkAutoAdvance(state);
+        } else {
+          // 超时/网络错误时 request 会以空数据 resolve（不抛错），同样计入失败
+          await this.handlePollFailure();
         }
       } catch {
-        // 忽略轮询失败
-      }
-    },
-
-    /**
-     * 投送态自动连播：电视播完一首后自动切下一首（或单曲循环重投当前歌）
-     * 通过防重复标记避免轮询持续触发
-     */
-    checkAutoAdvance(state: DlnaTransportState): void {
-      const statusStore = useStatusStore();
-      const duration = state.duration;
-      // 时长未知（部分渲染器返回 0）时不判断
-      if (!duration || duration <= 3) return;
-      const atEnd = state.currentTime >= duration - 2;
-      if (!atEnd) return;
-      // 用户最近手动 seek/拖动过：不自动切歌，避免误判
-      if (Date.now() - this.lastManualSeekAt < 5000) return;
-      // 电视已暂停在末尾（用户手动暂停）：不自动切歌
-      if (!state.playing && state.state !== "PLAYING") return;
-      // 同一首歌只自动切一次（新歌投送成功后 castingSongId 变化，可再次触发）
-      if (this.lastAutoAdvanceSongId != null && this.lastAutoAdvanceSongId === this.castingSongId) {
-        return;
-      }
-      this.lastAutoAdvanceSongId = this.castingSongId;
-      // 单曲循环：重新投送当前歌；否则切下一首（watch 联动自动投送）
-      if (statusStore.repeatMode === "one") {
-        const url = this.getCurrentUrl();
-        if (url) {
-          void this.castUrl(url, this.castingSongId ?? 0, this.getCurrentCover()).then((ok) => {
-            // 重投成功：复位防重复标记，允许歌曲再次播完时触发
-            if (ok) this.lastAutoAdvanceSongId = null;
-          });
-        }
-      } else {
-        void usePlayerController().nextOrPrev("next", true, true);
+        await this.handlePollFailure();
+      } finally {
+        syncInFlight = false;
       }
     },
 
@@ -547,16 +554,25 @@ export const useDlnaStore = defineStore("dlna", {
       this.changingSong = true;
       try {
         // 投送态下切歌：立即静音本地，避免新歌加载完成后在手机出声
-        useAudioManager().pause();
+        useAudioManager().setVolume(0);
         // 切歌后引擎 src 需要重新加载，轮询等待新歌地址就绪
         const url = await this.waitForCastableUrl(10000);
         if (!url) {
           // 新歌不可投送：断开投送并恢复本地播放，避免电视与前端状态脱节
           window.$message.warning("当前歌曲不支持投送，已断开投送并切回本地播放");
+          // 清空电视进度，避免断开续播把旧歌进度 seek 到新歌上
+          this.pollPosition = 0;
           await this.disconnect();
           return;
         }
-        await this.castUrl(url, songId, this.getCurrentCover());
+        const ok = await this.castUrl(url, songId, this.getCurrentCover());
+        if (!ok) {
+          // 自动投送失败：断开投送并恢复本地播放，避免电视与前端状态脱节
+          window.$message.warning("投送切歌失败，已断开投送并切回本地播放");
+          // 清空电视进度，避免断开续播把旧歌进度 seek 到新歌上
+          this.pollPosition = 0;
+          await this.disconnect();
+        }
       } finally {
         this.changingSong = false;
       }
@@ -579,11 +595,29 @@ export const useDlnaStore = defineStore("dlna", {
 // 投送全局联动是否已初始化（模块级单例，与组件挂载无关）
 let watchersReady = false;
 
+// 投送态轮询定时器（模块级单例：多个 CastControl 实例共享，避免重复轮询电视）
+let pollTimer: number | null = null;
+
+// 启动投送态轮询（已有定时器时直接返回）
+const startPolling = (): void => {
+  if (pollTimer !== null) return;
+  const store = useDlnaStore();
+  pollTimer = window.setInterval(() => void store.syncPosition(), 1500);
+};
+
+// 停止投送态轮询
+const stopPolling = (): void => {
+  if (pollTimer !== null) {
+    window.clearInterval(pollTimer);
+    pollTimer = null;
+  }
+};
+
 /**
  * 注册投送全局联动（进程级单例，由任意 CastControl 实例挂载时触发一次）
  * 1. 切歌联动：任何路径切歌（点播/上一首/下一首/随机/FM）都自动投送到电视
- * 2. 本地播放拦截：投送态下引擎一旦开始播放立即压住，保证手机静音
- * 3. 刷新后恢复投送会话：探测电视连接，不可达时自动退出投送态
+ * 2. 刷新后恢复投送会话：探测电视连接，不可达时自动退出投送态
+ * 注：投送静音采用「本地音量置 0 镜像播放」策略（见 muteLocalForCast），不拦截播放事件
  */
 export const setupDlnaWatchers = (): void => {
   if (watchersReady) return;
@@ -602,16 +636,22 @@ export const setupDlnaWatchers = (): void => {
     },
   );
 
-  // 本地播放拦截：投送态下引擎 play 事件立即压住（无差别拦截，含切歌加载完成的瞬间）
-  const audioManager = useAudioManager();
-  audioManager.addEventListener("play", () => {
-    if (!store.isCasting) return;
-    audioManager.pause();
-    useStatusStore().playStatus = true;
-  });
+  // 投送态变化联动轮询启停（模块级单例定时器，与组件生命周期解耦）
+  watch(
+    () => store.isCasting,
+    (casting) => {
+      if (casting) {
+        startPolling();
+      } else {
+        stopPolling();
+      }
+    },
+  );
 
   // 刷新后恢复投送会话：设备列表已丢失，先探测电视连接状态
   if (store.isCasting && store.activeUuid) {
+    // 已恢复投送态：直接启动轮询（watch 对持久化恢复的初始值不触发）
+    startPolling();
     void dlnaStatus(store.activeUuid)
       .then((state) => {
         // 电视不可达（后端重启/电视关机）时自动退出投送态，避免本地播放被误拦截
