@@ -1,5 +1,5 @@
 export { useSettingStore } from "./setting";
-export { useStatusStore } from "./status";
+export { useStatusStore, DEFAULT_PLAY_VOLUME } from "./status";
 export { useMusicStore } from "./music";
 export { useDataStore } from "./data";
 

@@ -4,6 +4,15 @@
     <div class="top-bar">
       <!-- DLNA 投送 -->
       <CastControl class="cast-mobile" />
+      <!-- 本地音量：常显图标，点按切换静音，音量为 0 时图标变为 VolumeOff -->
+      <n-tooltip trigger="hover" :show-arrow="false">
+        <template #trigger>
+          <div class="btn" @click.stop="player.toggleMute()">
+            <SvgIcon :name="statusStore.playVolumeIcon" :size="26" />
+          </div>
+        </template>
+        {{ localVolumeText }}
+      </n-tooltip>
       <!-- 收起按钮 -->
       <div class="btn" @click.stop="statusStore.showFullPlayer = false">
         <SvgIcon name="Down" :size="26" />
@@ -201,6 +210,13 @@ const dataStore = useDataStore();
 const dlnaStore = useDlnaStore();
 const player = usePlayerController();
 const { timeDisplay, toggleTimeFormat } = useTimeFormat();
+
+// 本地音量提示文本：音量为 0 时明确提示无法出声
+const localVolumeText = computed<string>(() =>
+  statusStore.playVolume === 0
+    ? "本地音量 0%（无法出声）"
+    : `本地音量 ${statusStore.playVolumePercent}%`,
+);
 
 // 播放/暂停：投送态下作用于电视，否则作用于本地
 const handlePlayOrPause = () => {

@@ -11,6 +11,9 @@ import type { RepeatModeType, ShuffleModeType } from "@/types/shared/play-mode";
 import { isDevBuild } from "@/utils/env";
 import { defineStore } from "pinia";
 
+/** 默认播放音量（静音键恢复的兜底音量） */
+export const DEFAULT_PLAY_VOLUME = 0.7;
+
 interface StatusState {
   /** 菜单折叠状态 */
   menuCollapsed: boolean;
@@ -182,8 +185,8 @@ export const useStatusStore = defineStore("status", {
     lyricIndex: -1,
     lyricLoading: false,
     playRate: 1,
-    playVolume: 0.7,
-    playVolumeMute: 0,
+    playVolume: DEFAULT_PLAY_VOLUME,
+    playVolumeMute: DEFAULT_PLAY_VOLUME,
     repeatMode: "off",
     shuffleMode: "off",
     personalFmMode: false,

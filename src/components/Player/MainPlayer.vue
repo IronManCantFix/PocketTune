@@ -241,8 +241,9 @@
           </n-flex>
         </Transition>
         <!-- 功能区 -->
-        <CastControl compact />
-        <PlayerRightMenu />
+        <CastControl v-if="!isMobile" compact />
+        <!-- 移动端底部栏空间紧张，音量入口只在播放器详情页提供 -->
+        <PlayerRightMenu :volume-display="isMobile ? 'hidden' : 'auto'" />
       </n-flex>
     </Transition>
   </div>
@@ -260,6 +261,7 @@ import {
 } from "@/stores";
 import { toLikeSong } from "@/utils/auth";
 import { useTimeFormat } from "@/composables/useTimeFormat";
+import { useMobile } from "@/composables/useMobile";
 import { useSwipe } from "@vueuse/core";
 import { copyData, coverLoaded, renderIcon, getShareUrl, audioSourceLabel } from "@/utils/helper";
 import {
@@ -283,6 +285,8 @@ const dlnaStore = useDlnaStore();
 
 const player = usePlayerController();
 const songManager = useSongManager();
+// 移动端底部播放栏空间紧张，投送入口只保留在播放器详情页
+const { isMobile } = useMobile();
 
 // 播放/暂停：投送态下作用于电视，否则作用于本地
 const handlePlayOrPause = () => {
