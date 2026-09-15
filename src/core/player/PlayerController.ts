@@ -1,6 +1,12 @@
 import { toRaw } from "vue";
 import { AudioErrorCode, type AudioEventType } from "@/core/audio-player/BaseAudioPlayer";
-import { useDataStore, useMusicStore, useSettingStore, useStatusStore } from "@/stores";
+import {
+  DEFAULT_PLAY_VOLUME,
+  useDataStore,
+  useMusicStore,
+  useSettingStore,
+  useStatusStore,
+} from "@/stores";
 import type { AudioSourceType, QualityType, SongType } from "@/types/main";
 import type { RepeatModeType, ShuffleModeType } from "@/types/shared/play-mode";
 import { type AudioAnalysis } from "@/types/audio/automix";
@@ -1045,6 +1051,8 @@ class PlayerController {
       const volumeChange = deltaY > 0 ? -increment : increment;
       statusStore.playVolume = Math.max(0, Math.min(statusStore.playVolume + volumeChange, 1));
     }
+    // 记录最近一次非 0 音量，作为静音键恢复的兜底
+    if (statusStore.playVolume > 0) statusStore.playVolumeMute = statusStore.playVolume;
     audioManager.setVolume(statusStore.playVolume);
   }
 
@@ -1055,7 +1063,11 @@ class PlayerController {
     // 是否静音
     const isMuted = statusStore.playVolume === 0;
     if (isMuted) {
-      statusStore.playVolume = statusStore.playVolumeMute;
+      // 兜底：历史持久化数据里 playVolumeMute 可能为 0，直接用会让静音键点了没反应
+      const restoreVolume =
+        statusStore.playVolumeMute > 0 ? statusStore.playVolumeMute : DEFAULT_PLAY_VOLUME;
+      statusStore.playVolumeMute = restoreVolume;
+      statusStore.playVolume = restoreVolume;
     } else {
       statusStore.playVolumeMute = statusStore.playVolume;
       statusStore.playVolume = 0;

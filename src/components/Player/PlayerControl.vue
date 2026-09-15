@@ -149,7 +149,8 @@
         <n-flex class="right" align="center" justify="end">
           <!-- 功能区 -->
           <CastControl />
-          <PlayerRightMenu />
+          <!-- 播放器详情页：本地音量入口常显，避免音量为 0 时看不出来 -->
+          <PlayerRightMenu volume-display="always" />
         </n-flex>
       </div>
     </Transition>

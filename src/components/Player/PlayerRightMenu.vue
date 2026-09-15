@@ -50,26 +50,45 @@
       </div>
     </n-dropdown>
     <!-- 音量 -->
-    <n-popover :show-arrow="false" :style="{ padding: 0 }">
+    <n-popover v-if="volumeDisplay !== 'hidden'" :show-arrow="false" :style="{ padding: 0 }">
       <template #trigger>
-        <div
-          class="menu-icon hidden"
-          @click.stop="handleVolumeIconClick"
-          @wheel="handleVolumeWheel"
-        >
-          <SvgIcon :name="volumeIcon" />
-        </div>
+        <n-tooltip trigger="hover" :show-arrow="false">
+          <template #trigger>
+            <div
+              :class="['menu-icon', { hidden: volumeDisplay === 'auto' }]"
+              @click.stop="handleVolumeIconClick"
+              @wheel="handleVolumeWheel"
+            >
+              <SvgIcon :name="volumeIcon" />
+            </div>
+          </template>
+          {{ volumeTooltipText }}
+        </n-tooltip>
       </template>
       <div class="volume-change" @wheel="handleVolumeWheel">
+        <!-- 投送态：滑块只控制电视音量 -->
         <n-slider
-          v-model:value="volumeModel"
+          v-if="dlnaStore.isCasting"
+          :value="tvVolumeModel"
           :tooltip="false"
           :min="0"
           :max="1"
           :step="0.01"
           vertical
+          @update:value="handleTvVolumeChange"
         />
-        <n-text class="slider-num hidden">{{ Math.round(volumeModel * 100) }}%</n-text>
+        <!-- 本地播放：滑块只控制本地音量 -->
+        <n-slider
+          v-else
+          :value="statusStore.playVolume"
+          :tooltip="false"
+          :min="0"
+          :max="1"
+          :step="0.01"
+          vertical
+          @update:value="handleLocalVolumeChange"
+        />
+        <n-text class="slider-num hidden">{{ displayVolumePercent }}%</n-text>
       </div>
     </n-popover>
     <!-- 播放列表 -->
@@ -111,6 +130,14 @@ const musicStore = useMusicStore();
 const dlnaStore = useDlnaStore();
 const player = usePlayerController();
 
+interface Props {
+  /** 音量入口展示：auto 跟随窄屏隐藏规则，always 常显（播放器详情页），hidden 不渲染（移动端底部栏） */
+  volumeDisplay?: "auto" | "always" | "hidden";
+}
+
+const props = withDefaults(defineProps<Props>(), { volumeDisplay: "auto" });
+const volumeDisplay = computed(() => props.volumeDisplay);
+
 const {
   currentPlayingLevel,
   qualityOptions,
@@ -151,20 +178,29 @@ const throttledCastVolume = useThrottleFn(
 
 // 音量模型：投送态绑定电视音量镜像（tvVolume/tvMuted），否则绑定本地音量（playVolume）
 // 两个音量体系彻底分离：电视音量绝不写入用户本地音量设置
-const volumeModel = computed<number>({
-  get: () => {
-    if (dlnaStore.isCasting) {
-      return (dlnaStore.tvMuted ? 0 : (dlnaStore.tvVolume ?? 0)) / 100;
-    }
-    return statusStore.playVolume;
-  },
-  set: (val: number) => {
-    if (dlnaStore.isCasting) {
-      throttledCastVolume(val);
-      return;
-    }
-    player.setVolume(val);
-  },
+const tvVolumeModel = computed<number>(
+  () => (dlnaStore.tvMuted ? 0 : (dlnaStore.tvVolume ?? 0)) / 100,
+);
+
+// 当前展示的音量（投送态为电视音量，本地播放为本地音量）
+const displayVolume = computed<number>(() =>
+  dlnaStore.isCasting ? tvVolumeModel.value : statusStore.playVolume,
+);
+
+// 展示的百分比
+const displayVolumePercent = computed<number>(() => Math.round(displayVolume.value * 100));
+
+// 投送态滑块：只写电视音量
+const handleTvVolumeChange = (val: number) => throttledCastVolume(val);
+
+// 本地滑块：只写本地音量
+const handleLocalVolumeChange = (val: number) => player.setVolume(val);
+
+// 音量提示：投送态提示电视音量，本地音量为 0 时明确提示无法出声
+const volumeTooltipText = computed<string>(() => {
+  if (dlnaStore.isCasting) return `电视音量 ${displayVolumePercent.value}%`;
+  if (statusStore.playVolume === 0) return "本地音量 0%（无法出声）";
+  return `本地音量 ${displayVolumePercent.value}%`;
 });
 
 // 音量图标：投送态依据电视音量/静音镜像，否则本地音量
@@ -187,11 +223,15 @@ const handleVolumeIconClick = () => {
   player.toggleMute();
 };
 
-// 滚轮调音量：基于当前音量模型增减（投送态转发电视，否则控制本地）
+// 滚轮调音量：按当前所处模式分流，两条写入路径互不串台
 const handleVolumeWheel = (e: WheelEvent) => {
-  const base = volumeModel.value;
+  const base = displayVolume.value;
   const next = Math.max(0, Math.min(1, base + (e.deltaY > 0 ? -0.05 : 0.05)));
-  volumeModel.value = next;
+  if (dlnaStore.isCasting) {
+    throttledCastVolume(next);
+    return;
+  }
+  player.setVolume(next);
 };
 
 // 更多功能
