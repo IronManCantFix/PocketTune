@@ -1206,6 +1206,14 @@ class PlayerController {
       window.$message.success("已开始播放");
       return;
     }
+    // 立即播放且歌曲已在播放列表中：原地播放，避免打乱队列顺序，播完自然接列表下一首
+    if (play) {
+      const existIndex = dataStore.playList.findIndex((s) => s.id === song.id);
+      if (existIndex !== -1) {
+        await this.togglePlayIndex(existIndex, true);
+        return;
+      }
+    }
     // 尝试添加
     const currentSongId = musicStore.playSong.id;
     const songIndex = await dataStore.setNextPlaySong(song, statusStore.playIndex);
