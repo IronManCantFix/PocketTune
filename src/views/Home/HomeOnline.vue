@@ -166,16 +166,20 @@ const sortedRecData = computed(() => {
 });
 
 // 获取全部推荐
-const getAllRecData = async () => {
+// force 为 true 时强制绕过缓存重新请求
+const getAllRecData = async (force = false) => {
   try {
     // 延时
     await sleep(300);
+
+    // 记录失败的模块
+    const failed: string[] = [];
 
     // 歌单
     try {
       const playlistRes = await getCacheData(
         personalized,
-        { key: "playlistRec", time: 10 },
+        { key: "playlistRec", time: 10, useCache: !force },
         "playlist",
         isLogin() ? 21 : 20,
       );
@@ -183,47 +187,78 @@ const getAllRecData = async () => {
         playlistRes.result?.filter((pl: any) => !pl.name.includes("私人雷达")),
       );
     } catch (error) {
+      failed.push("专属歌单");
       console.error("Error getting playlist:", error);
     }
 
     // 雷达
     try {
-      const radarRes = await getCacheData(radarPlaylist, { key: "radarRec", time: 30 });
+      const radarRes = await getCacheData(radarPlaylist, {
+        key: "radarRec",
+        time: 30,
+        useCache: !force,
+      });
       recData.value.radar.list = formatCoverList(radarRes);
     } catch (error) {
+      failed.push("雷达歌单");
       console.error("Error getting radar:", error);
     }
 
     // 歌手
     try {
-      const artistRes = await getCacheData(topArtists, { key: "artistRec", time: 10 }, 6);
+      const artistRes = await getCacheData(
+        topArtists,
+        { key: "artistRec", time: 10, useCache: !force },
+        6,
+      );
       recData.value.artist.list = formatArtistsList(artistRes.artists);
     } catch (error) {
+      failed.push("歌手推荐");
       console.error("Error getting artist:", error);
     }
 
     // MV
     try {
-      const videoRes = await getCacheData(allMv, { key: "videoRec", time: 10 });
+      const videoRes = await getCacheData(allMv, {
+        key: "videoRec",
+        time: 10,
+        useCache: !force,
+      });
       recData.value.video.list = formatCoverList(videoRes.data);
     } catch (error) {
+      failed.push("推荐 MV");
       console.error("Error getting video:", error);
     }
 
     // 播客
     try {
-      const radioRes = await getCacheData(radioRecommend, { key: "radioRec", time: 10 });
+      const radioRes = await getCacheData(radioRecommend, {
+        key: "radioRec",
+        time: 10,
+        useCache: !force,
+      });
       recData.value.radio.list = formatCoverList(radioRes.djRadios);
     } catch (error) {
+      failed.push("推荐播客");
       console.error("Error getting radio:", error);
     }
 
     // 新碟
     try {
-      const albumRes = await getCacheData(newAlbumsAll, { key: "albumRec", time: 10 });
+      const albumRes = await getCacheData(newAlbumsAll, {
+        key: "albumRec",
+        time: 10,
+        useCache: !force,
+      });
       recData.value.album.list = formatCoverList(albumRes.albums);
     } catch (error) {
+      failed.push("新碟上架");
       console.error("Error getting album:", error);
+    }
+
+    // 部分模块加载失败时提示
+    if (failed.length > 0) {
+      window.$message.warning(`${failed.join("、")} 加载失败，请稍后重试`);
     }
   } catch (error) {
     window.$message.error("个性化推荐获取出错");
@@ -231,7 +266,24 @@ const getAllRecData = async () => {
   }
 };
 
-onActivated(getAllRecData);
+// 手动刷新推荐数据
+const refreshing = ref(false);
+
+const handleRefresh = async () => {
+  if (refreshing.value) return;
+  refreshing.value = true;
+  try {
+    // 强制拉取最新数据
+    await getAllRecData(true);
+  } finally {
+    refreshing.value = false;
+  }
+};
+
+// 暴露给父组件调用
+defineExpose({ handleRefresh, refreshing });
+
+onActivated(() => getAllRecData());
 
 onMounted(() => {
   getAllRecData();

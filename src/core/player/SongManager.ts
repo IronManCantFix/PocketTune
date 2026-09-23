@@ -49,6 +49,27 @@ class SongManager {
   /** 预载下一首歌曲播放信息 */
   private nextPrefetch: AudioSource | undefined;
 
+  /** 私人FM补货中标记，避免并发重复拉取 */
+  private fmFetching = false;
+
+  /**
+   * 拉取私人FM并追加到列表（按 id 去重）
+   * @param replace 是否替换整个列表
+   * @returns 追加后的完整列表
+   */
+  private fetchFMBatch = async (replace = false): Promise<SongType[]> => {
+    const musicStore = useMusicStore();
+    const currentList = replace ? [] : musicStore.personalFM.list;
+    const res = await personalFm();
+    const newList = formatSongsList(res.data) || [];
+    // 过滤掉列表中已有的歌曲
+    const existIds = new Set(currentList.map((song) => song.id));
+    const uniqueList = newList.filter((song) => song.id && !existIds.has(song.id));
+    const mergedList = [...currentList, ...uniqueList];
+    musicStore.personalFM.list = mergedList;
+    return mergedList;
+  };
+
   public peekPrefetch(id: number): AudioSource | undefined {
     if (!this.nextPrefetch) return;
     if (this.nextPrefetch.id !== id) return;
@@ -259,16 +280,15 @@ class SongManager {
         const fmList = musicStore.personalFM.list;
         const fmIndex = musicStore.personalFM.playIndex;
         // 当前批次已是最后一首，提前拉取下一批追加到列表
-        if (fmIndex >= fmList.length - 1) {
+        if (fmIndex >= fmList.length - 1 && !this.fmFetching) {
           try {
-            const res = await personalFm();
-            const newList = formatSongsList(res.data);
-            if (newList?.length) {
-              musicStore.personalFM.list = [...fmList, ...newList];
-            }
+            this.fmFetching = true;
+            await this.fetchFMBatch();
           } catch (e) {
             console.warn("⚠️ 预拉取下一批私人FM失败", e);
             return;
+          } finally {
+            this.fmFetching = false;
           }
         }
         const nextSong = musicStore.personalFM.list[fmIndex + 1];
@@ -472,23 +492,33 @@ class SongManager {
     const statusStore = useStatusStore();
 
     try {
-      const fetchFM = async () => {
-        const res = await personalFm();
-        musicStore.personalFM.list = formatSongsList(res.data);
+      // 若列表为空，获取新列表
+      if (musicStore.personalFM.list.length === 0) {
         musicStore.personalFM.playIndex = 0;
-      };
-
-      // 若列表为空或已播放到最后，获取新列表
-      if (musicStore.personalFM.list.length === 0) await fetchFM();
+        await this.fetchFMBatch(true);
+      }
       // 如果需要播放下一首
       if (playNext) {
         statusStore.personalFmMode = true;
         // 如果当前列表还没播完
         if (musicStore.personalFM.playIndex < musicStore.personalFM.list.length - 1) {
           musicStore.personalFM.playIndex++;
+        } else if (!this.fmFetching) {
+          // 列表播完了，拉取新的一批并播放首首
+          try {
+            this.fmFetching = true;
+            // 丢弃已播完的旧列表，重新拉取
+            await this.fetchFMBatch(true);
+            musicStore.personalFM.playIndex = 0;
+          } finally {
+            this.fmFetching = false;
+          }
         } else {
-          // 列表播完了，获取新的
-          await fetchFM();
+          // 补货进行中，等待其完成后再推进，避免游标越界
+          await new Promise((resolve) => setTimeout(resolve, 300));
+          if (musicStore.personalFM.playIndex < musicStore.personalFM.list.length - 1) {
+            musicStore.personalFM.playIndex++;
+          }
         }
       }
     } catch (error) {
@@ -526,9 +556,10 @@ class SongManager {
       return;
     }
     try {
+      // 先取数据，确认有效后再覆盖列表，避免空结果清空当前列表
       const res = await personalFm();
-      const newList = formatSongsList(res.data);
-      if (!newList || newList.length === 0) {
+      const newList = formatSongsList(res.data) || [];
+      if (newList.length === 0) {
         throw new Error("加载私人漫游列表失败");
       }
       musicStore.personalFM.list = newList;
