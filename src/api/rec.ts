@@ -102,11 +102,16 @@ export const newAlbumsAll = (
   });
 };
 
-// 私人 FM
-export const personalFm = () => {
+/**
+ * 私人 FM
+ * @param {number} [limit=10] - 单次拉取数量
+ */
+export const personalFm = (limit: number = 10) => {
   return request({
-    url: "/personal_fm",
+    url: "/personal_fm_mode",
     params: {
+      mode: "DEFAULT",
+      limit,
       timestamp: Date.now(),
     },
   });
