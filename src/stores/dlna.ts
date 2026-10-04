@@ -29,6 +29,8 @@ const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout
 let syncInFlight = false;
 // 上次进度偏差再同步时间（限频，防止 seek 风暴）
 let lastProgressAlignAt = 0;
+// 切歌联动排队中的最新歌曲 id（切换进行中再切歌时记录，完成后补投，避免快速连切丢切换）
+let pendingSongChangeId: number | null = null;
 
 interface DlnaState {
   /** 发现的设备列表 */
@@ -627,9 +629,18 @@ export const useDlnaStore = defineStore("dlna", {
           // 电视已播到尾部：不镜像暂停本地，让本地引擎自然播完触发 ended，
           // 走正常的自动切歌链路（否则本地永远到不了结尾，自动切歌卡死）
           const tvNearEnd = state.duration > 0 && state.currentTime >= state.duration - 5;
+          // 本地引擎自身已接近结尾：同样不镜像暂停。
+          // 后台轮询被浏览器节流、电视播完转 STOPPED 后 RelTime 归零等场景下
+          // tvNearEnd 会漏判导致本地被误暂停，按本地引擎实时进度兜底
+          const audioManager = useAudioManager();
+          const localNearEnd =
+            audioManager.duration > 0 && audioManager.currentTime >= audioManager.duration - 5;
           // 本地以静音方式镜像电视播放，进度/歌词由本地引擎天然驱动，无需回写
           // 电视端状态变化（用户用电视遥控暂停/恢复）时镜像到本地引擎
-          if (state.playing !== statusStore.playStatus && !(!state.playing && tvNearEnd)) {
+          if (
+            state.playing !== statusStore.playStatus &&
+            !(!state.playing && (tvNearEnd || localNearEnd))
+          ) {
             statusStore.playStatus = state.playing;
             try {
               if (state.playing) {
@@ -682,13 +693,17 @@ export const useDlnaStore = defineStore("dlna", {
     /**
      * 等待引擎加载出可投送的新歌地址
      * 切歌后需要等网络解析完成（loadAndPlay 更新 src），轮询直到就绪或超时
+     * FFmpeg 引擎的 src 在 stop() 后不清空（仅 load/destroy 时 reset），
+     * 切歌瞬间会残留旧歌地址，必须排除，否则会把旧歌重投给电视且后续不再联动
      * @param timeout 超时（毫秒）
      */
     async waitForCastableUrl(timeout = 10000): Promise<string> {
       const start = Date.now();
+      // 上一次成功投送的地址即旧歌残留地址，跳过直到新地址加载出来
+      const staleUrl = this.lastCastUrl;
       while (Date.now() - start < timeout) {
         const url = this.getCurrentUrl();
-        if (url) return url;
+        if (url && url !== staleUrl) return url;
         await sleep(300);
       }
       return "";
@@ -703,35 +718,60 @@ export const useDlnaStore = defineStore("dlna", {
       if (!this.isCasting || !this.activeUuid) return;
       // 同一首歌不重复投送
       if (songId != null && this.castingSongId === songId) return;
-      // 防止与上一次切换的投送并发
-      if (this.changingSong) return;
+      // 切换进行中再切歌：记录最新歌曲 id，本轮完成后自动补投（不丢弃，保证连切最终一致）
+      if (this.changingSong) {
+        pendingSongChangeId = songId;
+        return;
+      }
       this.changingSong = true;
       try {
-        // 投送态下切歌：立即静音本地，避免新歌加载完成后在手机出声
-        useAudioManager().setVolume(0);
-        // 元素级静音：切后台直放会绕过增益节点，仅音量置 0 会漏音
-        useAudioManager().setMuted(true);
-        // 切歌后引擎 src 需要重新加载，轮询等待新歌地址就绪
-        const url = await this.waitForCastableUrl(10000);
-        if (!url) {
-          // 新歌不可投送：断开投送并恢复本地播放，避免电视与前端状态脱节
-          window.$message.warning("当前歌曲不支持投送，已断开投送并切回本地播放");
-          // 清空电视进度，避免断开续播把旧歌进度 seek 到新歌上
-          this.pollPosition = 0;
-          await this.disconnect();
-          return;
-        }
-        const ok = await this.castUrl(url, songId, this.getCurrentCover());
-        if (!ok) {
-          // 自动投送失败：断开投送并恢复本地播放，避免电视与前端状态脱节
-          window.$message.warning("投送切歌失败，已断开投送并切回本地播放");
-          // 清空电视进度，避免断开续播把旧歌进度 seek 到新歌上
-          this.pollPosition = 0;
-          await this.disconnect();
+        // 当前待投歌曲 id（循环内逐轮消费排队的新切歌请求）
+        let currentSongId: number | null = songId;
+        while (currentSongId != null) {
+          pendingSongChangeId = null;
+          const handled = await this.processSongChange(currentSongId);
+          // 处理中被断开投送时终止循环
+          if (!handled) break;
+          // 本轮完成期间又切了歌：继续处理最新的一首，否则退出
+          currentSongId = pendingSongChangeId;
         }
       } finally {
         this.changingSong = false;
       }
+    },
+
+    /**
+     * 执行单次切歌投送（由 handleSongChange 调用，含排队重入）
+     * 新歌不可投送（本地文件/实时流/加载失败）时断开投送并恢复本地播放，避免电视与前端脱节
+     * @param songId 新歌 id
+     * @returns false 表示投送态已结束，调用方终止排队循环
+     */
+    async processSongChange(songId: number): Promise<boolean> {
+      if (!this.isCasting || !this.activeUuid) return false;
+      // 投送态下切歌：立即静音本地，避免新歌加载完成后在手机出声
+      useAudioManager().setVolume(0);
+      // 元素级静音：切后台直放会绕过增益节点，仅音量置 0 会漏音
+      useAudioManager().setMuted(true);
+      // 切歌后引擎 src 需要重新加载，轮询等待新歌地址就绪（排除旧歌残留地址）
+      const url = await this.waitForCastableUrl(10000);
+      if (!url) {
+        // 新歌不可投送：断开投送并恢复本地播放，避免电视与前端状态脱节
+        window.$message.warning("当前歌曲不支持投送，已断开投送并切回本地播放");
+        // 清空电视进度，避免断开续播把旧歌进度 seek 到新歌上
+        this.pollPosition = 0;
+        await this.disconnect();
+        return false;
+      }
+      const ok = await this.castUrl(url, songId, this.getCurrentCover());
+      if (!ok) {
+        // 自动投送失败：断开投送并恢复本地播放，避免电视与前端状态脱节
+        window.$message.warning("投送切歌失败，已断开投送并切回本地播放");
+        // 清空电视进度，避免断开续播把旧歌进度 seek 到新歌上
+        this.pollPosition = 0;
+        await this.disconnect();
+        return false;
+      }
+      return true;
     },
   },
   persist: {
