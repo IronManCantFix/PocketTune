@@ -1,6 +1,7 @@
 import { mediaSessionManager } from "@/core/player/MediaSessionManager";
 import { usePlayerController } from "@/core/player/PlayerController";
-import { setUnblockSources } from "@/api/song";
+import { setUnblockSources, setUnblockMode } from "@/api/song";
+import { SongUnlockServer } from "@/core/player/SongManager";
 import { useDataStore, useSettingStore, useStatusStore } from "@/stores";
 import { printVersion } from "@/utils/log";
 import { onMounted, watch } from "vue";
@@ -65,5 +66,13 @@ export const useInit = () => {
         // 服务端不可达时静默跳过，设置页操作时会重试
       });
     }
+
+    // 回填解灰模式：服务端重启后恢复「默认渠道 / 洛雪源」的互斥状态
+    const lxEnabled = settingStore.songUnlockServer.some(
+      (s) => s.key === SongUnlockServer.LX && s.enabled,
+    );
+    setUnblockMode(lxEnabled ? "lx" : "default").catch(() => {
+      // 服务端不可达时静默跳过，设置页操作时会重试
+    });
   });
 };

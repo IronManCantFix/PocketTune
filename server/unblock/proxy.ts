@@ -2,19 +2,7 @@
 import axios, { type AxiosResponse } from "axios";
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { serverLog } from "../utils/logger";
-
-// 允许代理的音源域名后缀白名单（同时用于防御 SSRF）
-const ALLOWED_HOST_SUFFIXES = [
-  "kuwo.cn",
-  "kugou.com",
-  "migu.cn",
-  "miguvideo.com",
-  "bilivideo.com",
-  "bilibili.com",
-  "gdstudio.xyz",
-  "126.net",
-  "163.com",
-];
+import { createSafeLookup, getDynamicHostCount, validateTarget } from "./ssrf";
 
 // 各音源对应的伪装 Referer
 const REFERER_MAP: { suffix: string; referer: string }[] = [
@@ -43,25 +31,6 @@ const PASSTHROUGH_HEADERS = [
   "etag",
 ];
 
-// 校验目标地址是否在白名单内
-const isAllowedTarget = (rawUrl: string): URL | null => {
-  try {
-    const target = new URL(rawUrl);
-    if (target.protocol !== "http:" && target.protocol !== "https:") return null;
-    const host = target.hostname;
-    // 防御内网与本地地址
-    if (/^(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|0\.|\[::1\])/.test(host)) {
-      return null;
-    }
-    const allowed = ALLOWED_HOST_SUFFIXES.some(
-      (suffix) => host === suffix || host.endsWith(`.${suffix}`),
-    );
-    return allowed ? target : null;
-  } catch {
-    return null;
-  }
-};
-
 // 按目标域名挑选 Referer
 const refererFor = (host: string): string =>
   REFERER_MAP.find((item) => host === item.suffix || host.endsWith(`.${item.suffix}`))?.referer ??
@@ -69,28 +38,37 @@ const refererFor = (host: string): string =>
 
 // 初始化媒体代理
 export const initUnblockProxy = (fastify: FastifyInstance): void => {
+  // 逐跳校验的 lookup：重定向链上的每一跳都会重新做私网校验并固定 IP
+  const safeLookup = createSafeLookup((host) => {
+    serverLog.warn(`⚠️ 媒体代理拦截重定向目标: ${host}`);
+  });
+
   fastify.get(
     "/unblock/proxy",
     async (req: FastifyRequest<{ Querystring: { url?: string } }>, reply: FastifyReply) => {
       const rawUrl = req.query.url ?? "";
-      const target = isAllowedTarget(rawUrl);
-      if (!target) {
-        return reply.code(400).send({ code: 400, message: "不支持的代理地址" });
+      // 首跳校验：协议 + 白名单 + 私网拦截
+      const target = await validateTarget(rawUrl);
+      if (!target.ok) {
+        serverLog.warn(`⚠️ 媒体代理拦截: ${target.reason} (${rawUrl.slice(0, 100)})`);
+        return reply.code(400).send({ code: 400, message: target.reason });
       }
 
       try {
         // 流式转发，透传 Range 以支持拖动进度条
-        const upstream: AxiosResponse<NodeJS.ReadableStream> = await axios.get(target.href, {
+        const upstream: AxiosResponse<NodeJS.ReadableStream> = await axios.get(target.url.href, {
           responseType: "stream",
           timeout: 15000,
+          // 允许平台 CDN 重定向，但每一跳都经 safeLookup 校验
           maxRedirects: 5,
           headers: {
             "User-Agent": BROWSER_UA,
-            Referer: refererFor(target.hostname),
+            Referer: refererFor(target.host),
             ...(req.headers.range ? { Range: req.headers.range } : {}),
           },
+          lookup: safeLookup,
           validateStatus: () => true,
-        });
+        } as never);
 
         const headers: Record<string, string> = {
           "Access-Control-Allow-Origin": "*",
@@ -108,5 +86,5 @@ export const initUnblockProxy = (fastify: FastifyInstance): void => {
       }
     },
   );
-  serverLog.info("🌐 Register UnblockProxy successfully");
+  serverLog.info(`🌐 Register UnblockProxy successfully（动态放行域名: ${getDynamicHostCount()}）`);
 };

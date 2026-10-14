@@ -73,12 +73,86 @@ export const unlockSongUrl = (
   artist?: string,
   signal?: AbortSignal,
 ) => {
-  const params = server === SongUnlockServer.NETEASE ? { id } : { keyword, songName, artist };
+  // 洛雪源按网易云 songmid 调用脚本 wy 平台，需同时带上歌名与歌手
+  const params =
+    server === SongUnlockServer.NETEASE
+      ? { id }
+      : server === SongUnlockServer.LX
+        ? { id, songName, artist }
+        : { keyword, songName, artist };
   return request({
     baseURL: "/api/unblock",
     url: `/${server}`,
     params: { ...params, noCookie: true },
     signal,
+  });
+};
+
+// 获取解灰模式（默认渠道 / 洛雪源，两者互斥）
+export const getUnblockMode = () => {
+  return request({
+    baseURL: "/api/unblock",
+    url: "/mode",
+    method: "get",
+  });
+};
+
+// 切换解灰模式：lx 会停用服务端 UNM 解灰，default 恢复
+export const setUnblockMode = (mode: "default" | "lx") => {
+  return request({
+    baseURL: "/api/unblock",
+    url: "/mode",
+    method: "put",
+    data: { mode },
+  });
+};
+
+// 获取洛雪源脚本列表
+export const getLxSources = () => {
+  return request({
+    baseURL: "/api",
+    url: "/lx/sources",
+    method: "get",
+  });
+};
+
+// 导入洛雪源脚本（支持脚本内容或远程地址）
+export const importLxSource = (data: { script?: string; url?: string }) => {
+  return request({
+    baseURL: "/api",
+    url: "/lx/sources",
+    method: "post",
+    data,
+  });
+};
+
+// 启用/禁用洛雪源脚本
+export const toggleLxSource = (id: string, enabled: boolean) => {
+  return request({
+    baseURL: "/api",
+    url: "/lx/sources/toggle",
+    method: "put",
+    data: { id, enabled },
+  });
+};
+
+// 调整洛雪源脚本优先级
+export const reorderLxSources = (ids: string[]) => {
+  return request({
+    baseURL: "/api",
+    url: "/lx/sources/order",
+    method: "put",
+    data: { ids },
+  });
+};
+
+// 删除洛雪源脚本
+export const deleteLxSource = (id: string) => {
+  return request({
+    baseURL: "/api",
+    url: "/lx/sources",
+    method: "delete",
+    data: { id },
   });
 };
 

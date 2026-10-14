@@ -22,8 +22,19 @@ const SONG_URL_ROUTES = new Set([
   "song_download_url_v1",
 ]);
 
-// 是否启用解灰
-export const isUnmEnabled = (): boolean => process.env["UNM_ENABLED"] !== "false";
+// 是否被运行时开关关闭（前端启用洛雪源时置为 true，与默认解灰渠道互斥）
+export const getUnmDisabled = (): boolean => getStoreValue<boolean>("unmDisabled", false) === true;
+
+// 设置运行时开关：true 表示停用服务端解灰
+export const setUnmDisabled = (disabled: boolean): void => {
+  setStoreValue("unmDisabled", disabled);
+};
+
+// 是否启用解灰：环境变量为硬关闭，其次看运行时开关
+export const isUnmEnabled = (): boolean => {
+  if (process.env["UNM_ENABLED"] === "false") return false;
+  return !getUnmDisabled();
+};
 
 // 是否为歌 URL 类路由
 export const isSongUrlRoute = (routerName: string): boolean => SONG_URL_ROUTES.has(routerName);
