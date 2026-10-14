@@ -2,6 +2,8 @@ import { initNcmAPI } from "./netease";
 import { initUnblockAPI } from "./unblock";
 import { initQQMusicAPI } from "./qqmusic";
 import { initDlnaAPI } from "./dlna";
+import { initLxAPI } from "./lx";
+import { initLxSources } from "./lx/manager";
 import fastifyCookie from "@fastify/cookie";
 import fastifyMultipart from "@fastify/multipart";
 import fastify from "fastify";
@@ -50,6 +52,10 @@ const initAppServer = async () => {
             name: "DlnaAPI",
             url: "/api/dlna",
           },
+          {
+            name: "LxSourceAPI",
+            url: "/api/lx",
+          },
         ],
       });
     });
@@ -58,6 +64,11 @@ const initAppServer = async () => {
     server.register(initUnblockAPI, { prefix: "/api" });
     server.register(initQQMusicAPI, { prefix: "/api" });
     server.register(initDlnaAPI, { prefix: "/api" });
+    server.register(initLxAPI, { prefix: "/api" });
+    // 加载已启用的洛雪源脚本（失败不影响服务启动）
+    void initLxSources().catch((error) => {
+      serverLog.error("⚠️ 洛雪源初始化失败（服务继续运行）:", error);
+    });
     // 启动端口
     const port = Number(process.env.PORT || 3000);
     await server.listen({ port, host: "0.0.0.0" });

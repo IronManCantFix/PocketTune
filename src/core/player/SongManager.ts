@@ -23,6 +23,8 @@ export enum SongUnlockServer {
   NETEASE = "netease",
   BODIAN = "bodian",
   KUWO = "kuwo",
+  /** 洛雪自定义源，仅使用网易云 songmid 调用脚本的 wy 平台 */
+  LX = "lx",
 }
 
 /** 歌曲播放地址信息 */
@@ -222,6 +224,12 @@ class SongManager {
       servers = settingStore.songUnlockServer
         .filter((s) => s.enabled)
         .map((s) => s.key as SongUnlockServer);
+      // 互斥兜底：默认解锁源与洛雪源只能生效一边，避免同步失败时并发重复请求
+      if (servers.includes(SongUnlockServer.LX)) {
+        servers = [SongUnlockServer.LX];
+      } else {
+        servers = servers.filter((server) => server !== SongUnlockServer.LX);
+      }
     }
 
     if (servers.length === 0) {
@@ -251,13 +259,15 @@ class SongManager {
           quality = QualityType.SQ;
         }
         console.log(`最终音质判断：详细输出：`, { unlockUrl, quality });
+        // 洛雪源域名不可预知，服务端已按解析结果登记放行，此处强制走同源代理
+        const isLx = r.value.server === SongUnlockServer.LX;
         return {
           id: songId,
           // 第三方音源经同源代理转发，规避浏览器 CORS 拦截
-          url: toProxiedUrl(unlockUrl),
+          url: toProxiedUrl(unlockUrl, isLx),
           isUnlocked: true,
           quality,
-          source: r.value.server,
+          source: isLx ? "lx" : r.value.server,
         };
       }
     }

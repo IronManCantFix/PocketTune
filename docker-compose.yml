@@ -7,11 +7,15 @@ services:
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - /etc/timezone:/etc/timezone:ro
+      # 服务端数据目录：持久化洛雪源脚本等，删除此行会导致容器重建后脚本丢失
+      - ./data:/app/data
     ports:
       - 25884:25884
     restart: always
     environment:
       # 所有变量都不是必填项
+      # 服务端数据目录（存放洛雪源脚本等持久化数据）
+      - DATA_PATH=/app/data
       # UnblockNeteaseMusic 使用的音源（后端内置解灰）, 支持列表见 https://github.com/UnblockNeteaseMusic/server?tab=readme-ov-file#%E9%9F%B3%E6%BA%90%E6%B8%85%E5%8D%95
       - UNBLOCK_SOURCES=kugou kuwo bilibili
       # 是否启用后端内置解灰（默认开启）

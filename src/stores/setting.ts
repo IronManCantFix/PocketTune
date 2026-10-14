@@ -527,6 +527,8 @@ export const useSettingStore = defineStore("setting", {
       { key: SongUnlockServer.BODIAN, enabled: true },
       { key: SongUnlockServer.NETEASE, enabled: true },
       { key: SongUnlockServer.KUWO, enabled: false },
+      // 洛雪源默认关闭：脚本来自第三方，需用户显式启用
+      { key: SongUnlockServer.LX, enabled: false },
     ],
     unblockSources: [],
     countDownShow: true,

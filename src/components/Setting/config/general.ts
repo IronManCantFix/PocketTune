@@ -2,6 +2,7 @@ import { useDataStore, useSettingStore } from "@/stores";
 import { openExcludeComment } from "@/utils/modal";
 import SongUnlockManager from "@/components/Modal/Setting/SongUnlockManager.vue";
 import UnblockSources from "../components/UnblockSources.vue";
+import LxSourceList from "../components/LxSourceList.vue";
 import { SettingConfig, settingValue } from "@/types/settings";
 
 export const useGeneralSettings = (): SettingConfig => {
@@ -159,6 +160,14 @@ export const useGeneralSettings = (): SettingConfig => {
             description: "解灰失败时的备用直连音源顺序",
             noWrapper: true,
             component: markRaw(SongUnlockManager),
+          },
+          {
+            key: "lxSources",
+            label: "洛雪自定义源",
+            type: "custom",
+            description: "导入洛雪（LX Music）自定义音源脚本，作为额外解灰通道",
+            noWrapper: true,
+            component: markRaw(LxSourceList),
           },
         ],
       },

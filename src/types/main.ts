@@ -55,7 +55,8 @@ export type AudioSourceType =
   | "kugou"
   | "migu"
   | "bilibili"
-  | "pyncmd";
+  | "pyncmd"
+  | "lx";
 
 export type UserType = {
   id: number;

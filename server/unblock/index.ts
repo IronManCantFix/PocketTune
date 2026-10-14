@@ -1,7 +1,16 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import type { SongUrlResult } from "./unblock";
 import { serverLog } from "../utils/logger";
-import { getSources, getCustomSources, setCustomSources, getDefaultSources } from "../unm";
+import {
+  getSources,
+  getCustomSources,
+  setCustomSources,
+  getDefaultSources,
+  getUnmDisabled,
+  setUnmDisabled,
+  isUnmEnabled,
+} from "../unm";
+import { resolveMusicUrl } from "../lx/manager";
 import { initUnblockProxy } from "./proxy";
 import axios from "axios";
 import getKuwoSongUrl from "./kuwo";
@@ -57,6 +66,30 @@ export const initUnblockAPI = async (fastify: FastifyInstance) => {
       custom: getCustomSources() != null,
     });
   });
+  // 获取解灰模式：默认渠道与洛雪源互斥，mode 为 lx 时停用服务端 UNM 解灰
+  // 获取解灰模式：默认渠道与洛雪源互斥
+  fastify.get("/unblock/mode", (_, reply) => {
+    return reply.send({
+      // mode 为用户选择的模式，来自持久化开关，不受环境变量影响
+      mode: getUnmDisabled() ? "lx" : "default",
+      // 环境变量硬关闭时，洛雪源也无法反向启用默认解灰
+      envDisabled: process.env["UNM_ENABLED"] === "false",
+      // unmEnabled 为 UNM 解灰的实际生效状态
+      unmEnabled: isUnmEnabled(),
+    });
+  });
+  // 切换解灰模式（default 默认渠道 / lx 洛雪源）
+  fastify.put("/unblock/mode", async (req, reply) => {
+    const body = (req.body ?? {}) as { mode?: unknown };
+    const mode = body.mode === "lx" ? "lx" : "default";
+    setUnmDisabled(mode === "lx");
+    serverLog.info(
+      mode === "lx"
+        ? "🔀 解灰模式切换为洛雪源，已停用服务端 UNM 解灰"
+        : "🔀 解灰模式切换为默认渠道",
+    );
+    return reply.send({ mode, unmEnabled: isUnmEnabled() });
+  });
   // netease
   fastify.get(
     "/unblock/netease",
@@ -103,6 +136,21 @@ export const initUnblockAPI = async (fastify: FastifyInstance) => {
       reply: FastifyReply,
     ) => {
       const result = await getBodianSongUrl(buildMatchInfo(req.query));
+      return reply.send(result);
+    },
+  );
+  // 洛雪自定义源：仅使用网易云 songmid 调用脚本的 wy 平台
+  fastify.get(
+    "/unblock/lx",
+    async (
+      req: FastifyRequest<{
+        Querystring: { id?: string; songName?: string; artist?: string; quality?: string };
+      }>,
+      reply: FastifyReply,
+    ) => {
+      const { id, songName = "", artist = "", quality = "320k" } = req.query;
+      if (!id) return reply.send({ code: 404, url: null });
+      const result = await resolveMusicUrl(String(id), String(quality), songName, artist);
       return reply.send(result);
     },
   );

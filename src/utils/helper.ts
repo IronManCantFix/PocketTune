@@ -426,6 +426,7 @@ export const AUDIO_SOURCE_LABELS: Record<string, string> = {
   migu: "Migu",
   bilibili: "Bilibili",
   pyncmd: "Pyncmd",
+  lx: "洛雪源",
 };
 
 /**
